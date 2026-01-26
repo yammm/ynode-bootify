@@ -1,0 +1,83 @@
+# @ynode/bootify
+
+Copyright (c) 2026 Michael Welter <me@mikinho.com>
+
+[![npm version](https://img.shields.io/npm/v/@ynode/bootify.svg)](https://www.npmjs.com/package/@ynode/bootify)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A Fastify bootstrap plugin that incorporates standardized @ynode patterns for clustering,
+configuration, and lifeycle management.
+
+## Purpose
+
+`@ynode/bootify` eliminates the boilerplate code typically found in the entry points of `@ynode`
+applications. It consolidates:
+
+- **Cluster Management**: Automatically handles master/worker process forks using `@ynode/cluster`.
+- **Signal Handling**: Manages graceful shutdowns (`SIGINT`, `SIGTERM`) and zero-downtime reloads
+  (`SIGHUP`).
+- **Fastify Initialization**: Creates the server instance with standard configurations (like
+  `proxiable` and `autoshutdown`).
+
+## Installation
+
+```sh
+npm install @ynode/bootify
+```
+
+## Usage
+
+In your main entry file (e.g., `src/web.js`), simply import `bootify` and your configuration.
+
+```javascript
+#!/usr/bin/env node
+
+import { bootify } from "@ynode/bootify";
+import config from "./config.js"; // Your yargs configuration
+import pkg from "../package.json" with { type: "json" };
+
+bootify({
+    config,
+    pkg,
+    // Lazy-load your application logic
+    app: () => import("./app.js"),
+});
+```
+
+### Configuration Object (`config`)
+
+The `config` object is typically the resolved output of `yargs`. It supports the following reserved
+properties:
+
+- `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object).
+- `pidfile`: Path to write the PID file (optional).
+- `http2`: Enable HTTP/2 support (boolean).
+- `rewrite`: An object map for URL rewriting.
+- `sleep`: Options for `@ynode/autoshutdown`.
+- `listen`: The binding address/port string (e.g., `"3000"`, `"127.0.0.1:8080"`).
+
+### Unix Domain Sockets & `proxiable`
+
+If you bind to a Unix Domain Socket (by ignoring host/port in your config or passing a path),
+`bootify` automatically uses [`proxiable`](https://www.npmjs.com/package/proxiable) on the raw
+server instance. This fixes common issues where `req.socket.remoteAddress` is undefined or incorrect
+when running behind a proxy like Nginx over a socket.
+
+## API
+
+### `bootify(options)`
+
+Initializes the application lifecycle.
+
+#### Options
+
+| Property    | Type       | Description                                                                                        |
+| :---------- | :--------- | :------------------------------------------------------------------------------------------------- |
+| `app`       | `Function` | A function that returns a Promise resolving to the Fastify plugin module (must extract `default`). |
+| `config`    | `Object`   | The configuration object (usually from `argv`).                                                    |
+| `pkg`       | `Object`   | The parsed content of `package.json`.                                                              |
+| `validator` | `Function` | Optional function to validate `config` before starting.                                            |
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
