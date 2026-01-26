@@ -9,6 +9,9 @@ pids
 *.seed
 *.pid.lock
 
+# Env data
+.env
+
 # Docs
 docs/
 yuidoc.json
