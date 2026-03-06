@@ -60,7 +60,8 @@ bootify({
 The `config` object is typically the resolved output of `yargs`. It supports the following reserved
 properties:
 
-- `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object).
+- `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object). This object is passed
+  through to `@ynode/cluster` options.
 - `pidfile`: Path to write the PID file (optional).
 - `http2`: Enable HTTP/2 support (boolean).
 - `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be
@@ -71,6 +72,20 @@ properties:
   like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to
   `{ retries: 5, delay: 15000 }`.
+
+With `@ynode/cluster` `1.4.0+`, you can configure TTY command mode and reload commands via
+`cluster.tty`, for example:
+
+```js
+cluster: {
+  enabled: true,
+  tty: {
+    enabled: true,
+    commands: true,
+    reloadCommand: "rl"
+  }
+}
+```
 
 ### Unix Domain Sockets & `proxiable`
 
@@ -110,6 +125,8 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 - `BootifyManager`: when running as clustered master.
 - `BootifyManager.reload(): Promise<void>` for zero-downtime reload.
 - `BootifyManager.getMetrics()` for cluster worker/load metrics.
+- `BootifyManager.close(): Promise<void>` for programmatic cluster shutdown.
+- `BootifyManager.on/once/off(...)` for cluster lifecycle events.
 
 #### Startup Semantics
 

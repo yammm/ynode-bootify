@@ -23,8 +23,22 @@ export interface ListenRetryOptions {
     delay?: number;
 }
 
+export interface BootifyClusterTtyOptions {
+    enabled?: boolean;
+    commands?: boolean;
+    reloadCommand?: string;
+    stdin?: NodeJS.ReadStream;
+    stdout?: NodeJS.WriteStream;
+    prompt?: string;
+}
+
+export interface BootifyClusterOptions extends Record<string, any> {
+    enabled?: boolean;
+    tty?: BootifyClusterTtyOptions;
+}
+
 export interface BootifyConfig extends Record<string, any> {
-    cluster?: boolean | Record<string, any>;
+    cluster?: boolean | BootifyClusterOptions;
     pidfile?: string;
     http2?: boolean;
     rewrite?: Record<string, string>;
@@ -90,12 +104,43 @@ export interface BootifyClusterMetrics {
     minWorkers: number;
     scaleUpThreshold: number;
     scaleDownThreshold: number;
-    mode: string;
+    mode: "smart" | "max";
+}
+
+export type BootifyClusterEventName =
+    | "worker_online"
+    | "worker_exit"
+    | "worker_restart_scheduled"
+    | "worker_listening"
+    | "scale_up"
+    | "scale_down"
+    | "reload_start"
+    | "reload_end"
+    | "reload_fail"
+    | "shutdown_start"
+    | "shutdown_end";
+
+export interface BootifyClusterEvent {
+    type: BootifyClusterEventName;
+    [key: string]: unknown;
 }
 
 export interface BootifyManager {
     getMetrics: () => BootifyClusterMetrics;
     reload: () => Promise<void>;
+    close: () => Promise<void>;
+    on: (
+        eventName: BootifyClusterEventName,
+        listener: (event: BootifyClusterEvent) => void,
+    ) => BootifyManager;
+    once: (
+        eventName: BootifyClusterEventName,
+        listener: (event: BootifyClusterEvent) => void,
+    ) => BootifyManager;
+    off: (
+        eventName: BootifyClusterEventName,
+        listener: (event: BootifyClusterEvent) => void,
+    ) => BootifyManager;
 }
 
 export type BootifyResult = void | BootifyManager;

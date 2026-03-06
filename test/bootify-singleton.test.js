@@ -184,3 +184,36 @@ test("bootify skips SIGHUP wiring when manager has no reload method", async () =
     assert.strictEqual(processTarget.listenerCount("exit"), 1);
     assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
 });
+
+test("bootify passes cluster.tty options through to cluster run()", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    let capturedRunOptions = null;
+
+    const clusterOptions = {
+        enabled: true,
+        tty: {
+            enabled: true,
+            commands: true,
+            reloadCommand: "rl",
+            prompt: "cluster> ",
+        },
+    };
+
+    await bootify({
+        app: async () => async () => {},
+        config: { cluster: clusterOptions },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async (_startWorker, options) => {
+                capturedRunOptions = options;
+                return {};
+            },
+        },
+    });
+
+    assert.deepStrictEqual(capturedRunOptions, clusterOptions);
+});
