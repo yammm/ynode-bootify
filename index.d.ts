@@ -7,9 +7,35 @@ import { FastifyInstance, FastifyPluginAsync } from "fastify";
 type AppModule = { default: FastifyPluginAsync };
 type AppPlugin = FastifyPluginAsync | AppModule;
 
+export interface ListenOptions {
+    host?: string;
+    port?: number;
+    path?: string;
+    backlog?: number;
+    readableAll?: boolean;
+    writableAll?: boolean;
+    ipv6Only?: boolean;
+    exclusive?: boolean;
+}
+
+export interface ListenRetryOptions {
+    retries?: number;
+    delay?: number;
+}
+
+export interface BootifyConfig extends Record<string, any> {
+    cluster?: boolean | Record<string, any>;
+    pidfile?: string;
+    http2?: boolean;
+    rewrite?: Record<string, string>;
+    sleep?: number | Record<string, any>;
+    listen?: string | ListenOptions;
+    listenRetry?: ListenRetryOptions;
+}
+
 export interface BootifyLifecycleContext {
     fastify: FastifyInstance;
-    config: Record<string, any>;
+    config: BootifyConfig;
     pkg: Record<string, any>;
 }
 
@@ -26,12 +52,12 @@ export interface BootOptions {
      * A function that imports and returns the application entry point.
      * The module must export the Fastify plugin as `default`.
      */
-    app: (fastify: FastifyInstance, config: Record<string, any>) => Promise<AppPlugin> | AppPlugin;
+    app: (fastify: FastifyInstance, config: BootifyConfig) => Promise<AppPlugin> | AppPlugin;
 
     /**
      * The configuration object (typically parsed argv).
      */
-    config: Record<string, any>;
+    config: BootifyConfig;
 
     /**
      * The package.json content.
@@ -41,7 +67,7 @@ export interface BootOptions {
     /**
      * Optional validation function for configuration.
      */
-    validator?: (config: Record<string, any>) => Promise<void> | void;
+    validator?: (config: BootifyConfig) => Promise<void> | void;
 
     /**
      * Optional lifecycle hooks that run around listen/shutdown.

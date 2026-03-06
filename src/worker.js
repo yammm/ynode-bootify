@@ -147,6 +147,32 @@ export function parseListenConfig(listen) {
     );
 }
 
+export function resolveListenRetry(config = {}) {
+    const defaults = { retries: 5, delay: 15000 };
+    const retry = config.listenRetry;
+
+    if (retry === undefined || retry === null) {
+        return defaults;
+    }
+
+    if (typeof retry !== "object" || Array.isArray(retry)) {
+        throw new TypeError('Invalid "listenRetry" option. Expected an object.');
+    }
+
+    const retries = retry.retries ?? defaults.retries;
+    const delay = retry.delay ?? defaults.delay;
+
+    if (!Number.isInteger(retries) || retries < 1) {
+        throw new TypeError('Invalid "listenRetry.retries" option. Expected an integer >= 1.');
+    }
+
+    if (!Number.isInteger(delay) || delay < 0) {
+        throw new TypeError('Invalid "listenRetry.delay" option. Expected an integer >= 0.');
+    }
+
+    return { retries, delay };
+}
+
 /**
  * Tell Fastify to start listening with retry logic
  */
@@ -307,7 +333,8 @@ export async function start({ app, config, log, pkg, hooks = {} }) {
         dispose();
     });
 
-    await listen(fastify, 5, 15000);
+    const retry = resolveListenRetry(config);
+    await listen(fastify, retry.retries, retry.delay);
 
     if (typeof hooks.onAfterListen === "function") {
         try {

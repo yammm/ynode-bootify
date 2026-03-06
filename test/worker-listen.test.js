@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseListenConfig } from "../src/worker.js";
+import { parseListenConfig, resolveListenRetry } from "../src/worker.js";
 
 test("parseListenConfig parses plain port with default host", () => {
     assert.deepStrictEqual(parseListenConfig("3000"), {
@@ -81,5 +81,44 @@ test("parseListenConfig rejects listen object with path and port together", () =
     assert.throws(
         () => parseListenConfig({ path: "/tmp/app.sock", port: 3000 }),
         /"path" cannot be combined with "host" or "port"\./,
+    );
+});
+
+test("resolveListenRetry returns defaults when unset", () => {
+    assert.deepStrictEqual(resolveListenRetry({}), {
+        retries: 5,
+        delay: 15000,
+    });
+});
+
+test("resolveListenRetry accepts partial config", () => {
+    assert.deepStrictEqual(resolveListenRetry({ listenRetry: { retries: 2 } }), {
+        retries: 2,
+        delay: 15000,
+    });
+});
+
+test("resolveListenRetry accepts full config", () => {
+    assert.deepStrictEqual(resolveListenRetry({ listenRetry: { retries: 3, delay: 1000 } }), {
+        retries: 3,
+        delay: 1000,
+    });
+});
+
+test("resolveListenRetry rejects non-object config", () => {
+    assert.throws(() => resolveListenRetry({ listenRetry: 2 }), /Invalid "listenRetry" option/);
+});
+
+test("resolveListenRetry rejects invalid retries", () => {
+    assert.throws(
+        () => resolveListenRetry({ listenRetry: { retries: 0 } }),
+        /Invalid "listenRetry\.retries" option/,
+    );
+});
+
+test("resolveListenRetry rejects invalid delay", () => {
+    assert.throws(
+        () => resolveListenRetry({ listenRetry: { delay: -1 } }),
+        /Invalid "listenRetry\.delay" option/,
     );
 });

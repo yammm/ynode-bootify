@@ -49,6 +49,20 @@ export default yargs(hideBin(process.argv))
         type: "number",
         default: 5000,
     })
+    .option("listenRetry", {
+        describe: 'Listen retry policy as JSON (e.g. \'{"retries":3,"delay":1000}\')',
+        default: { retries: 5, delay: 15000 },
+        coerce: (arg) => {
+            if (typeof arg === "object" && arg !== null) {
+                return arg;
+            }
+            try {
+                return JSON.parse(arg);
+            } catch {
+                return arg;
+            }
+        },
+    })
     .option("verbose", {
         alias: "v",
         describe: "Enable verbose logging",
