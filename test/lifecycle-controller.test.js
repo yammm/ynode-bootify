@@ -12,6 +12,7 @@ function createFastifyDouble() {
         },
         log: {
             error() {},
+            warn() {},
         },
     };
 }
@@ -142,6 +143,32 @@ test("createLifecycleController ignores null worker messages", async () => {
 
     worker.emit("message", { cmd: "cluster-count", count: 3 });
     assert.strictEqual(fastify.clusterCount, 3);
+
+    controller.dispose();
+});
+
+test("createLifecycleController ignores invalid cluster-count payloads", async () => {
+    const signalTarget = new EventEmitter();
+    const worker = new EventEmitter();
+    const fastify = createFastifyDouble();
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget,
+        worker,
+    });
+
+    worker.emit("message", { cmd: "cluster-count", count: 0 });
+    worker.emit("message", { cmd: "cluster-count", count: -1 });
+    worker.emit("message", { cmd: "cluster-count", count: "2" });
+    await Promise.resolve();
+
+    assert.strictEqual(fastify.clusterCount, 1);
+
+    worker.emit("message", { cmd: "cluster-count", count: 4 });
+    assert.strictEqual(fastify.clusterCount, 4);
 
     controller.dispose();
 });

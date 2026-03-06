@@ -278,7 +278,14 @@ export function createLifecycleController({
     if (worker) {
         workerMessageHandler = async (msg) => {
             if (msg && typeof msg === "object" && msg.cmd === "cluster-count") {
-                fastify.clusterCount = msg.count;
+                if (Number.isInteger(msg.count) && msg.count > 0) {
+                    fastify.clusterCount = msg.count;
+                } else {
+                    fastify.log.warn(
+                        { count: msg.count },
+                        "Ignoring invalid cluster-count message payload.",
+                    );
+                }
             }
 
             if (msg === "shutdown") {
