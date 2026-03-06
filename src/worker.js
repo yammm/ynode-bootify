@@ -29,6 +29,64 @@ async function retryOperation(operation, { retries = 5, delay = 100, onRetry } =
     }
 }
 
+function parsePort(port) {
+    const portNumber = Number(port);
+    if (!Number.isInteger(portNumber) || portNumber < 0 || portNumber > 65535) {
+        throw new Error(`Invalid listen port "${port}"`);
+    }
+    return portNumber;
+}
+
+function isSocketPath(value) {
+    return (
+        value.startsWith("/") ||
+        value.startsWith("./") ||
+        value.startsWith("../") ||
+        value.startsWith(".\\") ||
+        value.startsWith("..\\") ||
+        value.startsWith("\\\\") ||
+        /^[A-Za-z]:[\\/]/.test(value) ||
+        value.includes("/") ||
+        value.includes("\\")
+    );
+}
+
+export function parseListenConfig(listen) {
+    const value = String(listen ?? 0).trim();
+
+    if (value.length === 0) {
+        return { port: 0, host: "127.0.0.1" };
+    }
+
+    if (isSocketPath(value)) {
+        return { path: value };
+    }
+
+    if (/^\d+$/.test(value)) {
+        return { port: parsePort(value), host: "127.0.0.1" };
+    }
+
+    const ipv6WithPort = /^\[([^\]]+)\]:(\d+)$/.exec(value);
+    if (ipv6WithPort) {
+        return { host: ipv6WithPort[1], port: parsePort(ipv6WithPort[2]) };
+    }
+
+    const hostPort = /^([^:]+):(\d+)$/.exec(value);
+    if (hostPort) {
+        return { host: hostPort[1], port: parsePort(hostPort[2]) };
+    }
+
+    if (value.includes(":")) {
+        throw new Error(
+            `Invalid listen address "${value}". Expected "host:port" or "[ipv6]:port" when using colons.`,
+        );
+    }
+
+    throw new Error(
+        `Invalid listen value "${value}". Expected "port", "host:port", "[ipv6]:port", or socket path.`,
+    );
+}
+
 /**
  * Tell Fastify to start listening with retry logic
  */
@@ -37,10 +95,7 @@ async function listen(fastify, retries = 5, delay = 100) {
     const pkg = fastify.pkg;
 
     // Selective hearing
-    const [port, host = "127.0.0.1"] = String(config.listen ?? 0)
-        .split(":")
-        .reverse();
-    const listenConfig = !isNaN(port) ? { port: Number(port), host } : { path: port };
+    const listenConfig = parseListenConfig(config.listen);
 
     listenConfig.listenTextResolver = (address) =>
         `Moshi moshi ${pkg.name} v${pkg.version} in ${config.environment} mode listening on ${address}`;

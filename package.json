@@ -26,7 +26,7 @@
         "ynode"
     ],
     "engines": {
-        "node": ">=18"
+        "node": ">=20"
     },
     "devDependencies": {
         "@eslint/js": "^9.37.0",
@@ -54,7 +54,7 @@
         "ver:preview": "npx autover --no-amend --dry-run --short",
         "ver:apply": "npx autover --guard-unchanged --short",
         "test": "node --test",
-        "prepublishOnly": "npm test || true",
+        "prepublishOnly": "npm test && npm run lint",
         "postversion": "git push && git push --tags"
     },
     "publishConfig": {
@@ -62,6 +62,7 @@
     },
     "files": [
         "src",
+        "index.d.ts",
         "README.md",
         "LICENSE"
     ],
@@ -69,11 +70,11 @@
         "@ynode/autoshutdown": "^1.2.1",
         "@ynode/cluster": "^1.2.3",
         "@ynode/versionify": "^1.0.0",
+        "@ynode/ylog": "^1.0.2",
         "mkpidfile": "^1.0.1",
         "proxiable": "^1.0.1"
     },
     "peerDependencies": {
-        "@ynode/ylog": "^1.0.2",
         "fastify": "^5.7.1"
     }
 }

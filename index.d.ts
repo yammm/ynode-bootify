@@ -2,14 +2,17 @@
  * Type definitions for @ynode/bootify
  */
 
-import { FastifyPluginAsync } from "fastify";
+import { FastifyInstance, FastifyPluginAsync } from "fastify";
+
+type AppModule = { default: FastifyPluginAsync };
+type AppPlugin = FastifyPluginAsync | AppModule;
 
 export interface BootOptions {
     /**
      * A function that imports and returns the application entry point.
      * The module must export the Fastify plugin as `default`.
      */
-    app: () => Promise<{ default: FastifyPluginAsync }>;
+    app: (fastify: FastifyInstance, config: Record<string, any>) => Promise<AppPlugin> | AppPlugin;
 
     /**
      * The configuration object (typically parsed argv).
@@ -19,7 +22,7 @@ export interface BootOptions {
     /**
      * The package.json content.
      */
-    pkg: Record<string, any>;
+    pkg?: Record<string, any>;
 
     /**
      * Optional validation function for configuration.
