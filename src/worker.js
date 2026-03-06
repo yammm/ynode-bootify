@@ -175,6 +175,81 @@ function resolveListenAddress(server) {
     return `${address.address}:${address.port}`;
 }
 
+export function createLifecycleController({
+    fastify,
+    config,
+    pkg,
+    hooks = {},
+    signalTarget = process,
+    worker = cluster.worker,
+}) {
+    const lifecycleContext = { fastify, config, pkg };
+
+    let shutdownPromise = null;
+    const gracefulShutdown = async (signal) => {
+        if (!shutdownPromise) {
+            shutdownPromise = (async () => {
+                if (typeof hooks.onShutdown === "function") {
+                    await hooks.onShutdown({ ...lifecycleContext, signal });
+                }
+                await fastify.close();
+            })();
+        }
+        return shutdownPromise;
+    };
+
+    const signalHandlers = new Map();
+    ["SIGINT", "SIGTERM", "SIGUSR2"].forEach((signal) => {
+        const handler = async () => {
+            try {
+                await gracefulShutdown(signal);
+            } catch (ex) {
+                fastify.log.error(ex, `Error during shutdown after ${signal}`);
+            }
+        };
+        signalHandlers.set(signal, handler);
+        signalTarget.on(signal, handler);
+    });
+
+    let workerMessageHandler = null;
+    if (worker) {
+        workerMessageHandler = async (msg) => {
+            if (typeof msg === "object" && msg.cmd === "cluster-count") {
+                fastify.clusterCount = msg.count;
+            }
+
+            if (msg === "shutdown") {
+                try {
+                    await gracefulShutdown("shutdown");
+                } catch (ex) {
+                    fastify.log.error(ex, "Error during shutdown command handling");
+                }
+            }
+        };
+
+        worker.on("message", workerMessageHandler);
+    }
+
+    const off = (target, event, handler) => {
+        if (typeof target.off === "function") {
+            target.off(event, handler);
+            return;
+        }
+        if (typeof target.removeListener === "function") {
+            target.removeListener(event, handler);
+        }
+    };
+
+    const dispose = () => {
+        signalHandlers.forEach((handler, signal) => off(signalTarget, signal, handler));
+        if (worker && workerMessageHandler) {
+            off(worker, "message", workerMessageHandler);
+        }
+    };
+
+    return { lifecycleContext, gracefulShutdown, dispose };
+}
+
 /**
  * Start the worker process
  * @param {object} context
@@ -212,51 +287,12 @@ export async function start({ app, config, log, pkg, hooks = {} }) {
         await hooks.onBeforeListen(lifecycleContext);
     }
 
-    let shutdownPromise = null;
-    const gracefulShutdown = async (signal) => {
-        if (!shutdownPromise) {
-            shutdownPromise = (async () => {
-                if (typeof hooks.onShutdown === "function") {
-                    await hooks.onShutdown({ ...lifecycleContext, signal });
-                }
-                await fastify.close();
-            })();
-        }
-        return shutdownPromise;
-    };
+    const controller = createLifecycleController({ fastify, config, pkg, hooks });
+    const { gracefulShutdown, dispose } = controller;
 
-    // setup signal handlers so process exit event can be triggered
-    ["SIGINT", "SIGTERM", "SIGUSR2"].forEach((signal) =>
-        process.on(signal, async () => {
-            try {
-                await gracefulShutdown(signal);
-            } catch (ex) {
-                fastify.log.error(ex, `Error during shutdown after ${signal}`);
-            }
-        }),
-    );
-
-    // graceful exit if our master requests it
-    if (cluster.worker) {
-        cluster.worker.on("message", async (msg) => {
-            if (typeof msg === "object" && msg.cmd === "cluster-count") {
-                fastify.clusterCount = msg.count;
-            }
-            switch (msg) {
-                case "shutdown": {
-                    try {
-                        await gracefulShutdown("shutdown");
-                    } catch (ex) {
-                        fastify.log.error(ex, "Error during shutdown command handling");
-                    }
-                    break;
-                }
-            }
-        });
-
-        // Uncomment to force exit but shouldn't be needed
-        // cluster.worker.on("disconnect", () => process.nextTick(process.exit));
-    }
+    fastify.addHook("onClose", async () => {
+        dispose();
+    });
 
     await listen(fastify, 5, 15000);
 
