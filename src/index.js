@@ -42,7 +42,18 @@ import { start } from "./worker.js";
 import ylog from "@ynode/ylog";
 
 const BOOTIFY_ONCE_ERROR = "bootify() can only be called once per process.";
-let bootifyStarted = false;
+const BOOTIFY_STARTING_ERROR = "bootify() is already starting in this process.";
+let bootifyState = "idle";
+
+function off(target, event, handler) {
+    if (typeof target.off === "function") {
+        target.off(event, handler);
+        return;
+    }
+    if (typeof target.removeListener === "function") {
+        target.removeListener(event, handler);
+    }
+}
 
 function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -84,11 +95,11 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
     const processTarget = _internal.process ?? process;
     const runFn = _internal.run ?? run;
     const ylogFn = _internal.ylog ?? ylog;
-    const isBootifyStartedFn = _internal.isBootifyStarted ?? (() => bootifyStarted);
-    const markBootifyStartedFn =
-        _internal.markBootifyStarted ??
-        (() => {
-            bootifyStarted = true;
+    const getBootifyStateFn = _internal.getBootifyState ?? (() => bootifyState);
+    const setBootifyStateFn =
+        _internal.setBootifyState ??
+        ((nextState) => {
+            bootifyState = nextState;
         });
     const loadMkpidfileFn =
         _internal.loadMkpidfile ??
@@ -112,48 +123,77 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
         validateHooks(hooks);
     }
 
-    if (isBootifyStartedFn()) {
+    const currentState = getBootifyStateFn();
+    if (currentState === "starting") {
+        throw new Error(BOOTIFY_STARTING_ERROR);
+    }
+    if (currentState === "started") {
         throw new Error(BOOTIFY_ONCE_ERROR);
     }
-    markBootifyStartedFn();
+    setBootifyStateFn("starting");
 
-    if (validator) {
-        await validator(config);
+    const sigquitHandler = () => {
+        process.abort();
+    };
+    let exitHandler = null;
+    let sighupHandler = null;
+
+    try {
+        if (validator) {
+            await validator(config);
+        }
+
+        if (!pkg) {
+            const pkgUrl = pathToFileURL(join(process.cwd(), "package.json")).href;
+            pkg = (await import(pkgUrl, { with: { type: "json" } })).default;
+        }
+
+        // logging
+        const log = ylogFn(import.meta, { pid: true });
+
+        // terminate with core dump
+        processTarget.on("SIGQUIT", sigquitHandler);
+
+        // bye bye
+        exitHandler = (code) => {
+            log.info(`Sayonara. Exit code: ${code}`);
+        };
+        processTarget.on("exit", exitHandler);
+
+        // mkpidfile  module
+        if (config.pidfile) {
+            const mkpidfile = _internal.mkpidfile ?? (await loadMkpidfileFn());
+            mkpidfile(config.pidfile);
+        }
+
+        // main
+        const manager = await runFn(
+            async () => start({ app, config, log, pkg, hooks }),
+            {
+                ...(typeof config.cluster === "object"
+                    ? config.cluster
+                    : { enabled: config.cluster }),
+            },
+            log,
+        );
+
+        // trigger zero-downtime reload
+        if (manager && manager.reload) {
+            sighupHandler = () => manager.reload();
+            processTarget.on("SIGHUP", sighupHandler);
+        }
+
+        setBootifyStateFn("started");
+        return manager;
+    } catch (ex) {
+        setBootifyStateFn("idle");
+        off(processTarget, "SIGQUIT", sigquitHandler);
+        if (exitHandler) {
+            off(processTarget, "exit", exitHandler);
+        }
+        if (sighupHandler) {
+            off(processTarget, "SIGHUP", sighupHandler);
+        }
+        throw ex;
     }
-
-    if (!pkg) {
-        const pkgUrl = pathToFileURL(join(process.cwd(), "package.json")).href;
-        pkg = (await import(pkgUrl, { with: { type: "json" } })).default;
-    }
-
-    // logging
-    const log = ylogFn(import.meta, { pid: true });
-
-    // terminate with core dump
-    processTarget.on("SIGQUIT", process.abort);
-
-    // bye bye
-    processTarget.on("exit", (code) => {
-        log.info(`Sayonara. Exit code: ${code}`);
-    });
-
-    // mkpidfile  module
-    if (config.pidfile) {
-        const mkpidfile = _internal.mkpidfile ?? (await loadMkpidfileFn());
-        mkpidfile(config.pidfile);
-    }
-
-    // main
-    const manager = await runFn(
-        async () => start({ app, config, log, pkg, hooks }),
-        { ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }) },
-        log,
-    );
-
-    // trigger zero-downtime reload
-    if (manager && manager.reload) {
-        processTarget.on("SIGHUP", manager.reload);
-    }
-
-    return manager;
 }

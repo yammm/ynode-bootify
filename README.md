@@ -107,9 +107,24 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 `bootify(options)` resolves to one of:
 
 - `void`: when clustering is disabled or executing in a worker process.
-- `BootifyManager`: when running as clustered master, with:
-- `reload(): Promise<void>` for zero-downtime reload.
-- `getMetrics()` for cluster worker/load metrics.
+- `BootifyManager`: when running as clustered master.
+- `BootifyManager.reload(): Promise<void>` for zero-downtime reload.
+- `BootifyManager.getMetrics()` for cluster worker/load metrics.
+
+#### Startup Semantics
+
+`bootify` uses a process-level startup state machine:
+
+- `idle`: no startup attempt is active.
+- `starting`: a startup attempt is in progress.
+- `started`: startup succeeded and the process is now locked to a single boot lifecycle.
+
+Behavior:
+
+- A second call while `starting` throws `bootify() is already starting in this process.`
+- A call after successful startup (`started`) throws
+  `bootify() can only be called once per process.`
+- If startup fails, state is reset back to `idle` and a later retry is allowed.
 
 ## License
 

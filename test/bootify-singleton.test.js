@@ -18,12 +18,12 @@ function createLogStub() {
     };
 }
 
-function createSingletonState(started = false) {
-    let active = started;
+function createBootifyState(state = "idle") {
+    let current = state;
     return {
-        isBootifyStarted: () => active,
-        markBootifyStarted: () => {
-            active = true;
+        getBootifyState: () => current,
+        setBootifyState: (nextState) => {
+            current = nextState;
         },
     };
 }
@@ -31,7 +31,7 @@ function createSingletonState(started = false) {
 test("bootify rejects repeated valid invocations", async () => {
     const processTarget = new EventEmitter();
     let runCalls = 0;
-    const singleton = createSingletonState();
+    const bootifyState = createBootifyState();
 
     const options = {
         app: async () => async () => {},
@@ -40,7 +40,7 @@ test("bootify rejects repeated valid invocations", async () => {
         _internal: {
             process: processTarget,
             ylog: () => createLogStub(),
-            ...singleton,
+            ...bootifyState,
             run: async () => {
                 runCalls += 1;
                 return {};
@@ -55,7 +55,7 @@ test("bootify rejects repeated valid invocations", async () => {
 
 test("bootify creates pidfile when pidfile config is set", async () => {
     const processTarget = new EventEmitter();
-    const singleton = createSingletonState();
+    const bootifyState = createBootifyState();
     const pidfileCalls = [];
 
     await bootify({
@@ -65,7 +65,7 @@ test("bootify creates pidfile when pidfile config is set", async () => {
         _internal: {
             process: processTarget,
             ylog: () => createLogStub(),
-            ...singleton,
+            ...bootifyState,
             run: async () => ({}),
             mkpidfile: (path) => {
                 pidfileCalls.push(path);
@@ -74,4 +74,63 @@ test("bootify creates pidfile when pidfile config is set", async () => {
     });
 
     assert.deepStrictEqual(pidfileCalls, ["/tmp/ynode-bootify.pid"]);
+});
+
+test("bootify allows retry after failed startup", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    let runCalls = 0;
+
+    const options = {
+        app: async () => async () => {},
+        config: { cluster: false },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async () => {
+                runCalls += 1;
+                if (runCalls === 1) {
+                    throw new Error("startup failed");
+                }
+                return {};
+            },
+        },
+    };
+
+    await assert.rejects(() => bootify(options), /startup failed/);
+    assert.strictEqual(processTarget.listenerCount("SIGQUIT"), 0);
+    assert.strictEqual(processTarget.listenerCount("exit"), 0);
+    assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
+    await assert.doesNotReject(() => bootify(options));
+    assert.strictEqual(runCalls, 2);
+});
+
+test("bootify rejects concurrent call while startup is in progress", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    let resolveRun = null;
+
+    const runPromise = new Promise((resolve) => {
+        resolveRun = resolve;
+    });
+
+    const options = {
+        app: async () => async () => {},
+        config: { cluster: false },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async () => runPromise,
+        },
+    };
+
+    const firstBoot = bootify(options);
+    await assert.rejects(() => bootify(options), /bootify\(\) is already starting in this process/);
+
+    resolveRun({});
+    await firstBoot;
 });
