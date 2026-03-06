@@ -54,8 +54,8 @@ properties:
 - `http2`: Enable HTTP/2 support (boolean).
 - `rewrite`: An object map for URL rewriting.
 - `sleep`: Options for `@ynode/autoshutdown`.
-- `listen`: The binding address/port string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`),
-  or a Unix socket path.
+- `listen`: The binding address/port string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or
+  a Unix socket path.
 
 ### Unix Domain Sockets & `proxiable`
 
@@ -72,12 +72,12 @@ Initializes the application lifecycle.
 
 #### Options
 
-| Property    | Type       | Description                                                                                        |
-| :---------- | :--------- | :------------------------------------------------------------------------------------------------- |
+| Property    | Type       | Description                                                                                                |
+| :---------- | :--------- | :--------------------------------------------------------------------------------------------------------- |
 | `app`       | `Function` | A function called as `app(fastify, config)` that returns either a Fastify plugin or module with `default`. |
-| `config`    | `Object`   | The configuration object (usually from `argv`).                                                    |
-| `pkg`       | `Object`   | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted).        |
-| `validator` | `Function` | Optional function to validate `config` before starting.                                            |
+| `config`    | `Object`   | The configuration object (usually from `argv`).                                                            |
+| `pkg`       | `Object`   | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted).                 |
+| `validator` | `Function` | Optional function to validate `config` before starting.                                                    |
 
 ## License
 

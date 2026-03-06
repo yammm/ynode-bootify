@@ -26,4 +26,15 @@
 # Git pre-commit hook
 #
 
-npx eslint --no-warn-ignored $(git diff --cached --name-only --diff-filter=ACMRTUXB | tr '\n' ' ')
+set -euo pipefail
+
+staged_files=()
+while IFS= read -r -d '' file; do
+    staged_files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMRTUXB -z)
+
+if [[ ${#staged_files[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+npx eslint --no-warn-ignored "${staged_files[@]}"
