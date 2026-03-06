@@ -341,27 +341,31 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
     // add cluster count to fastify instance
     fastify.decorate("clusterCount", 1);
 
-    // resolve app plugin
-    const appPlugin = resolveAppPlugin(await app(fastify, config));
-
-    // register the main application logic from app.js
-    fastify.register(appPlugin);
-
     const lifecycleContext = { fastify, config, pkg };
+    let gracefulShutdown = null;
+    let dispose = () => {};
+    let startupShutdownSignal = "startup-error";
 
-    if (typeof hooks.onBeforeListen === "function") {
-        await hooks.onBeforeListen(lifecycleContext);
-    }
-
-    const controller = lifecycleControllerFactory({ fastify, config, pkg, hooks });
-    const { gracefulShutdown, dispose } = controller;
-
-    fastify.addHook("onClose", async () => {
-        dispose();
-    });
-
-    const retry = resolveListenRetry(config);
     try {
+        const controller = lifecycleControllerFactory({ fastify, config, pkg, hooks });
+        gracefulShutdown = controller.gracefulShutdown;
+        dispose = controller.dispose;
+
+        fastify.addHook("onClose", async () => {
+            dispose();
+        });
+
+        // resolve app plugin
+        const appPlugin = resolveAppPlugin(await app(fastify, config));
+
+        // register the main application logic from app.js
+        fastify.register(appPlugin);
+
+        if (typeof hooks.onBeforeListen === "function") {
+            await hooks.onBeforeListen(lifecycleContext);
+        }
+
+        const retry = resolveListenRetry(config);
         await listenFn(fastify, retry.retries, retry.delay);
 
         if (typeof hooks.onAfterListen === "function") {
@@ -371,13 +375,17 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
                     address: resolveListenAddress(fastify.server),
                 });
             } catch (ex) {
-                await gracefulShutdown("onAfterListen-error");
+                startupShutdownSignal = "onAfterListen-error";
                 throw ex;
             }
         }
     } catch (ex) {
         try {
-            await gracefulShutdown("startup-error");
+            if (gracefulShutdown) {
+                await gracefulShutdown(startupShutdownSignal);
+            } else {
+                await fastify.close();
+            }
         } catch (shutdownEx) {
             fastify.log.error(shutdownEx, "Error during startup cleanup.");
         } finally {

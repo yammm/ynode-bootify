@@ -67,3 +67,41 @@ test("start disposes signal listeners when startup fails before listen completes
     assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
     assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
 });
+
+test("start closes server and disposes listeners when app bootstrap fails", async () => {
+    const signalTarget = new EventEmitter();
+    const fastify = createFastifyStub();
+    const startupError = new Error("app failed");
+    let listenCalls = 0;
+
+    await assert.rejects(
+        () =>
+            start({
+                app: async () => {
+                    throw startupError;
+                },
+                config: { listen: 0, environment: "test" },
+                log: fastify.log,
+                pkg: { name: "test", version: "1.0.0" },
+                _internal: {
+                    createServer: async () => fastify,
+                    listen: async () => {
+                        listenCalls += 1;
+                    },
+                    createLifecycleController: (context) =>
+                        createLifecycleController({
+                            ...context,
+                            signalTarget,
+                            worker: null,
+                        }),
+                },
+            }),
+        startupError,
+    );
+
+    assert.strictEqual(listenCalls, 0);
+    assert.strictEqual(fastify.closeCalls, 1);
+    assert.strictEqual(signalTarget.listenerCount("SIGINT"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
+});
