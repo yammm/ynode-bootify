@@ -17,7 +17,6 @@ release: check
 	@if [ -z "$(VERSION)" ]; then echo "VERSION required"; exit 2; fi
 	npm version $(VERSION)
 	npm publish --access public
-	git push && git push --tags
 
 check:
 	@command -v npm >/dev/null 2>&1 || { echo "npm not found"; exit 1; }
