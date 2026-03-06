@@ -123,3 +123,25 @@ test("createLifecycleController still closes fastify when onShutdown hook throws
 
     controller.dispose();
 });
+
+test("createLifecycleController ignores null worker messages", async () => {
+    const signalTarget = new EventEmitter();
+    const worker = new EventEmitter();
+    const fastify = createFastifyDouble();
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget,
+        worker,
+    });
+
+    worker.emit("message", null);
+    await Promise.resolve();
+
+    worker.emit("message", { cmd: "cluster-count", count: 3 });
+    assert.strictEqual(fastify.clusterCount, 3);
+
+    controller.dispose();
+});
