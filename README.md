@@ -66,7 +66,8 @@ The `config` object is typically the resolved output of `yargs`. It supports the
 properties:
 
 - `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object). This object is passed
-  through to `@ynode/cluster` options.
+  through to `@ynode/cluster` options. When omitted, clustering defaults to enabled; set
+  `cluster: false` to force single-process mode.
 - `pidfile`: Path to write the PID file (optional).
 - `http2`: Enable HTTP/2 support (boolean).
 - `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.

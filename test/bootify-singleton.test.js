@@ -171,6 +171,29 @@ test("bootify skips SIGHUP wiring when manager has no reload method", async () =
     assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
 });
 
+test("bootify defaults cluster config to enabled when config.cluster is omitted", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    let capturedRunOptions = null;
+
+    await bootify({
+        app: async () => async () => {},
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async (_startWorker, options) => {
+                capturedRunOptions = options;
+                return {};
+            },
+        },
+    });
+
+    assert.deepStrictEqual(capturedRunOptions, { enabled: undefined });
+});
+
 test("bootify skips SIGHUP wiring when manager reload is not a function", async () => {
     const processTarget = new EventEmitter();
     const bootifyState = createBootifyState();
