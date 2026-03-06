@@ -26,6 +26,10 @@ jobs:
             - name: Install deps
               run: npm ci
 
+            - name: Audit production dependencies
+              if: matrix.node-version == '20'
+              run: npm audit --omit=dev --audit-level=high
+
             - name: Lint
               run: npm run lint
 

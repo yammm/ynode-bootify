@@ -1,6 +1,6 @@
 # Release helper
 # Usage: make release VERSION=1.0.0
-.PHONY: release check test lint docs clean
+.PHONY: release check verify test lint docs clean
 
 VERSION ?=
 
@@ -13,10 +13,12 @@ clean:
 lint:
 	npm run lint
 
-release: check
+release: check verify
 	@if [ -z "$(VERSION)" ]; then echo "VERSION required"; exit 2; fi
 	npm version $(VERSION)
 	npm publish --access public
+
+verify: lint test docs
 
 check:
 	@command -v npm >/dev/null 2>&1 || { echo "npm not found"; exit 1; }
