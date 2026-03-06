@@ -30,6 +30,9 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+import { pathToFileURL } from "node:url";
+import { join } from "node:path";
+
 // server factory function
 import { run } from "@ynode/cluster";
 import { start } from "./worker.js";
@@ -54,7 +57,8 @@ export async function bootify({ app, config, pkg, validator }) {
     }
 
     if (!pkg) {
-        pkg = (await import(`${process.cwd()}/package.json`, { with: { type: "json" } })).default;
+        const pkgUrl = pathToFileURL(join(process.cwd(), "package.json")).href;
+        pkg = (await import(pkgUrl, { with: { type: "json" } })).default;
     }
 
     // logging
