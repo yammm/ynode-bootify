@@ -28,6 +28,7 @@ import { rewriteUrl } from "./rewrite.js";
 export async function createServer(config, log) {
     const fastify = Fastify({
         loggerInstance: log,
+        trustProxy: config.trustProxy ?? false,
         http2: !!config.http2,
         disableRequestLogging: true,
         rewriteUrl: (req) => rewriteUrl(req, config),
