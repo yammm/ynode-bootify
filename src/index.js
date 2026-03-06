@@ -133,6 +133,10 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
     setBootifyStateFn("starting");
 
     const sigquitHandler = () => {
+        if (typeof processTarget.abort === "function") {
+            processTarget.abort();
+            return;
+        }
         process.abort();
     };
     let exitHandler = null;
@@ -178,8 +182,12 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
         );
 
         // trigger zero-downtime reload
-        if (manager && manager.reload) {
-            sighupHandler = () => manager.reload();
+        if (manager && typeof manager.reload === "function") {
+            sighupHandler = () => {
+                Promise.resolve(manager.reload()).catch((ex) => {
+                    log.error(ex, "SIGHUP-triggered reload failed.");
+                });
+            };
             processTarget.on("SIGHUP", sighupHandler);
         }
 

@@ -41,6 +41,7 @@ export interface BootifyConfig extends Record<string, any> {
     cluster?: boolean | BootifyClusterOptions;
     pidfile?: string;
     http2?: boolean;
+    trustProxy?: boolean | string | number | Record<string, any>;
     rewrite?: Record<string, string>;
     sleep?: number | Record<string, any>;
     listen?: string | number | ListenOptions;

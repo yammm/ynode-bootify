@@ -185,6 +185,108 @@ test("bootify skips SIGHUP wiring when manager has no reload method", async () =
     assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
 });
 
+test("bootify skips SIGHUP wiring when manager reload is not a function", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+
+    await bootify({
+        app: async () => async () => {},
+        config: { cluster: true },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async () => ({ reload: "nope" }),
+        },
+    });
+
+    assert.strictEqual(processTarget.listenerCount("SIGQUIT"), 1);
+    assert.strictEqual(processTarget.listenerCount("exit"), 1);
+    assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
+});
+
+test("bootify catches and logs SIGHUP-triggered reload failures", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    const reloadError = new Error("reload failed");
+    const unhandledRejections = [];
+    const errorLogs = [];
+    const log = createLogStub();
+    log.error = (...args) => {
+        errorLogs.push(args);
+    };
+
+    const onUnhandledRejection = (reason) => {
+        unhandledRejections.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    try {
+        await bootify({
+            app: async () => async () => {},
+            config: { cluster: true },
+            pkg: { name: "test", version: "1.0.0" },
+            _internal: {
+                process: processTarget,
+                ylog: () => log,
+                ...bootifyState,
+                run: async () => ({
+                    reload: async () => {
+                        throw reloadError;
+                    },
+                }),
+            },
+        });
+
+        processTarget.emit("SIGHUP");
+        await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+        process.off("unhandledRejection", onUnhandledRejection);
+    }
+
+    assert.strictEqual(unhandledRejections.length, 0);
+    assert.strictEqual(errorLogs.length, 1);
+    assert.strictEqual(errorLogs[0][0], reloadError);
+    assert.match(errorLogs[0][1], /SIGHUP-triggered reload failed/);
+});
+
+test("bootify uses processTarget.abort for SIGQUIT", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    let targetAbortCalls = 0;
+    processTarget.abort = () => {
+        targetAbortCalls += 1;
+    };
+
+    const originalAbort = process.abort;
+    let processAbortCalls = 0;
+    process.abort = () => {
+        processAbortCalls += 1;
+    };
+
+    try {
+        await bootify({
+            app: async () => async () => {},
+            config: { cluster: false },
+            pkg: { name: "test", version: "1.0.0" },
+            _internal: {
+                process: processTarget,
+                ylog: () => createLogStub(),
+                ...bootifyState,
+                run: async () => ({}),
+            },
+        });
+
+        processTarget.emit("SIGQUIT");
+    } finally {
+        process.abort = originalAbort;
+    }
+
+    assert.strictEqual(targetAbortCalls, 1);
+    assert.strictEqual(processAbortCalls, 0);
+});
+
 test("bootify passes cluster.tty options through to cluster run()", async () => {
     const processTarget = new EventEmitter();
     const bootifyState = createBootifyState();

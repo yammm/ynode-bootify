@@ -36,23 +36,28 @@ import { bootify } from "@ynode/bootify";
 import config from "./config.js"; // Your yargs configuration
 import pkg from "../package.json" with { type: "json" };
 
-bootify({
-    config,
-    pkg,
-    // Lazy-load your application logic
-    app: () => import("./app.js"),
-    hooks: {
-        onBeforeListen: async ({ fastify }) => {
-            fastify.log.info("Preparing to listen...");
+try {
+    await bootify({
+        config,
+        pkg,
+        // Lazy-load your application logic
+        app: () => import("./app.js"),
+        hooks: {
+            onBeforeListen: async ({ fastify }) => {
+                fastify.log.info("Preparing to listen...");
+            },
+            onAfterListen: async ({ address }) => {
+                console.log(`Listening at ${address}`);
+            },
+            onShutdown: async ({ signal }) => {
+                console.log(`Shutdown triggered by ${signal}`);
+            },
         },
-        onAfterListen: async ({ address }) => {
-            console.log(`Listening at ${address}`);
-        },
-        onShutdown: async ({ signal }) => {
-            console.log(`Shutdown triggered by ${signal}`);
-        },
-    },
-});
+    });
+} catch (ex) {
+    console.error(ex);
+    process.exitCode = 1;
+}
 ```
 
 ### Configuration Object (`config`)
@@ -64,6 +69,7 @@ properties:
   through to `@ynode/cluster` options.
 - `pidfile`: Path to write the PID file (optional).
 - `http2`: Enable HTTP/2 support (boolean).
+- `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.
 - `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be
   strings. Non-string values are ignored.
 - `sleep`: Options for `@ynode/autoshutdown`.
@@ -89,10 +95,11 @@ cluster: {
 
 ### Unix Domain Sockets & `proxiable`
 
-If you bind to a Unix Domain Socket (by ignoring host/port in your config or passing a path),
-`bootify` automatically uses [`proxiable`](https://www.npmjs.com/package/proxiable) on the raw
-server instance. This fixes common issues where `req.socket.remoteAddress` is undefined or incorrect
-when running behind a proxy like Nginx over a socket.
+If you bind to a Unix Domain Socket by setting `listen` to a socket path (for example
+`"/tmp/app.sock"` or `{ path: "/tmp/app.sock" }`), `bootify` automatically uses
+[`proxiable`](https://www.npmjs.com/package/proxiable) on the raw server instance. This fixes common
+issues where `req.socket.remoteAddress` is undefined or incorrect when running behind a proxy like
+Nginx over a socket.
 
 ## API
 
