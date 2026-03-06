@@ -34,3 +34,6 @@ jobs:
 
             - name: Format check
               run: npm run format:check
+
+            - name: Package dry run
+              run: npm pack --dry-run
