@@ -37,3 +37,7 @@ jobs:
 
             - name: Package dry run
               run: npm pack --dry-run
+
+            - name: Build docs
+              if: matrix.node-version == '20'
+              run: npm run docs
