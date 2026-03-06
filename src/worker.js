@@ -1,7 +1,5 @@
 /**
- *  worker.js: The Application Worker
- *
- * @module worker
+ * @fileoverview worker.js: The Application Worker.
  *
  * This module is responsible for the runtime lifecycle of the application.
  * It creates the Fastify server, handles signal listeners, and starts listening.

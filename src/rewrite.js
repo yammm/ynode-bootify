@@ -1,13 +1,11 @@
 /**
- *  rewrite.js: URL Rewrite Manager
+ * @fileoverview rewrite.js: URL Rewrite Manager.
  *
- * @module rewrite
- *
- * Simple URL rewrite module
+ * Simple URL rewrite module.
  */
 
 /**
- * Manages the application"s rewriteing.
+ * Manages the application's rewriting.
  * @param {object} req The raw Node.js HTTP request, not the `FastifyRequest` object.
  * @param {object} config - The configuration object.
  * @returns {string} The path that the request should be mapped to.

@@ -6,7 +6,7 @@ Copyright (c) 2026 Michael Welter <me@mikinho.com>
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Fastify bootstrap plugin that incorporates standardized @ynode patterns for clustering,
-configuration, and lifeycle management.
+configuration, and lifecycle management.
 
 ## Purpose
 

@@ -1,7 +1,5 @@
 /**
- *  server.js: The Server Factory
- *
- * @module server
+ * @fileoverview server.js: The Server Factory.
  *
  * Its single responsibility is to build and configure the Fastify server instance.
  * It acts like a factory that assembles the server with all its plugins and routes

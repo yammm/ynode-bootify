@@ -45,14 +45,14 @@
         "eslint-plugin-prettier": "^5.5.4",
         "fastify": "^5.7.1",
         "globals": "^16.4.0",
+        "jsdoc": "^4.0.5",
         "prettier": "^3.6.2",
         "rimraf": "^6.0.1",
-        "yargs": "^18.0.0",
-        "yuidocjs": "^0.10.2"
+        "yargs": "^18.0.0"
     },
     "scripts": {
         "docs": "node scripts/gen-docs.mjs",
-        "docs:clean": "rimraf docs || rmdir /s /q docs 2> NUL || true",
+        "docs:clean": "rimraf docs jsdoc.json || (rmdir /s /q docs 2> NUL & del /f /q jsdoc.json 2> NUL) || true",
         "docs:open": "node -e \"import('node:child_process').then(m=>m.exec(process.platform==='win32'?'start docs/index.html':(process.platform==='darwin'?'open docs/index.html':'xdg-open docs/index.html')))\"",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

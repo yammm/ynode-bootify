@@ -1,7 +1,5 @@
 /**
- * A Fastify application bootstrapper and lifecycle manager with lots of @ynode helpers
- *
- * @module @ynode/bootify
+ * @fileoverview A Fastify application bootstrapper and lifecycle manager with lots of @ynode helpers.
  *
  * This file is the entry point. It loads the configuration and initializes the
  * cluster manager. The actual application logic runs in the worker process.
