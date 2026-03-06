@@ -22,9 +22,12 @@ export function rewriteUrl(req, config) {
         return req.url;
     }
 
-    const url = rewrite[req.url];
+    const [pathname, ...queryParts] = req.url.split("?");
+    const queryString = queryParts.length > 0 ? "?" + queryParts.join("?") : "";
+
+    const url = rewrite[pathname];
     if (url) {
-        return url;
+        return url + queryString;
     }
 
     return req.url;

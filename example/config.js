@@ -1,6 +1,6 @@
 /**
  * Example Configuration
- * 
+ *
  * Demonstrates a robust configuration setup using yargs.
  * Defines standard options for clustering, listening, and environment.
  */

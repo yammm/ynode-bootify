@@ -7,7 +7,7 @@
  *
  * This file is the entry point. It loads the configuration and initializes the
  * cluster manager. The actual application logic runs in the worker process.
- * 
+ *
  * Demonstrates how to use @ynode/bootify with a robust configuration.
  */
 
