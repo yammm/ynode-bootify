@@ -96,8 +96,18 @@ function parseListenObject(listen) {
         );
     }
 
-    ["backlog", "readableAll", "writableAll", "ipv6Only", "exclusive"].forEach((key) => {
+    if (listen.backlog !== undefined) {
+        if (!Number.isInteger(listen.backlog) || listen.backlog < 0) {
+            throw new TypeError('Invalid "listen.backlog" option. Expected an integer >= 0.');
+        }
+        listenConfig.backlog = listen.backlog;
+    }
+
+    ["readableAll", "writableAll", "ipv6Only", "exclusive"].forEach((key) => {
         if (listen[key] !== undefined) {
+            if (typeof listen[key] !== "boolean") {
+                throw new TypeError(`Invalid "listen.${key}" option. Expected a boolean.`);
+            }
             listenConfig[key] = listen[key];
         }
     });

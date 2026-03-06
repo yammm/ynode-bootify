@@ -56,6 +56,20 @@ test("parseListenConfig parses object listen config with path and options", () =
     });
 });
 
+test("parseListenConfig rejects invalid listen backlog option", () => {
+    assert.throws(
+        () => parseListenConfig({ port: 3000, backlog: -1 }),
+        /Invalid "listen\.backlog" option/,
+    );
+});
+
+test("parseListenConfig rejects non-boolean listen flag options", () => {
+    assert.throws(
+        () => parseListenConfig({ port: 3000, readableAll: "yes" }),
+        /Invalid "listen\.readableAll" option/,
+    );
+});
+
 test("parseListenConfig rejects malformed host:port", () => {
     assert.throws(
         () => parseListenConfig("localhost:abc"),
