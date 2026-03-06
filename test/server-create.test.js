@@ -2,21 +2,7 @@ import assert from "node:assert/strict";
 import cluster from "node:cluster";
 import { test } from "node:test";
 import { createServer } from "../src/server.js";
-
-function createLogStub() {
-    return {
-        level: "info",
-        fatal() {},
-        error() {},
-        warn() {},
-        info() {},
-        debug() {},
-        trace() {},
-        child() {
-            return this;
-        },
-    };
-}
+import { createLogStub } from "../test-utils/log-stub.js";
 
 async function withWorkerFlag(workerFlag, fn) {
     const previous = cluster.isWorker;

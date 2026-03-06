@@ -1,21 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { start } from "../src/worker.js";
-
-function createLogStub() {
-    return {
-        level: "info",
-        fatal() {},
-        error() {},
-        warn() {},
-        info() {},
-        debug() {},
-        trace() {},
-        child() {
-            return this;
-        },
-    };
-}
+import { createLogStub } from "../test-utils/log-stub.js";
 
 test("start rejects app result when not a plugin function", async () => {
     await assert.rejects(

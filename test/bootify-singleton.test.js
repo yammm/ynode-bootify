@@ -2,21 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import { bootify } from "../src/index.js";
-
-function createLogStub() {
-    return {
-        level: "info",
-        fatal() {},
-        error() {},
-        warn() {},
-        info() {},
-        debug() {},
-        trace() {},
-        child() {
-            return this;
-        },
-    };
-}
+import { createLogStub } from "../test-utils/log-stub.js";
 
 function createBootifyState(state = "idle") {
     let current = state;

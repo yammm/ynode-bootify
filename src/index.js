@@ -34,6 +34,7 @@ import { join } from "node:path";
 // server factory function
 import { run } from "@ynode/cluster";
 import { start } from "./worker.js";
+import { off } from "./events.js";
 
 // configs
 // import pkg from "${process.cwd()}/package.json" with { type: "json" };
@@ -44,16 +45,6 @@ import ylog from "@ynode/ylog";
 const BOOTIFY_ONCE_ERROR = "bootify() can only be called once per process.";
 const BOOTIFY_STARTING_ERROR = "bootify() is already starting in this process.";
 let bootifyState = "idle";
-
-function off(target, event, handler) {
-    if (typeof target.off === "function") {
-        target.off(event, handler);
-        return;
-    }
-    if (typeof target.removeListener === "function") {
-        target.removeListener(event, handler);
-    }
-}
 
 function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);

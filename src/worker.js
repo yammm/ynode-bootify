@@ -7,6 +7,7 @@
 
 import cluster from "node:cluster";
 import { createServer } from "./server.js";
+import { off } from "./events.js";
 
 /**
  * Helper to retry an async operation
@@ -309,16 +310,6 @@ export function createLifecycleController({
 
         worker.on("message", workerMessageHandler);
     }
-
-    const off = (target, event, handler) => {
-        if (typeof target.off === "function") {
-            target.off(event, handler);
-            return;
-        }
-        if (typeof target.removeListener === "function") {
-            target.removeListener(event, handler);
-        }
-    };
 
     const dispose = () => {
         signalHandlers.forEach((handler, signal) => off(signalTarget, signal, handler));

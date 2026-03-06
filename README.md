@@ -93,6 +93,23 @@ cluster: {
 }
 ```
 
+### Production Configuration Example
+
+For a production deployment behind a reverse proxy, combine `trustProxy`, explicit `listen`, and a
+bounded `listenRetry` policy:
+
+```js
+{
+  trustProxy: true,
+  listen: { host: "0.0.0.0", port: 8080, backlog: 511 },
+  listenRetry: { retries: 8, delay: 5000 }
+}
+```
+
+- `trustProxy: true` ensures `request.ip` respects forwarded headers.
+- Explicit `listen` avoids accidental ephemeral port binding.
+- `listenRetry` helps absorb short dependency/network startup windows.
+
 ### Unix Domain Sockets & `proxiable`
 
 If you bind to a Unix Domain Socket by setting `listen` to a socket path (for example
