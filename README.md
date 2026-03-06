@@ -14,8 +14,8 @@ configuration, and lifecycle management.
 applications. It consolidates:
 
 - **Cluster Management**: Automatically handles master/worker process forks using `@ynode/cluster`.
-- **Signal Handling**: Manages graceful shutdowns (`SIGINT`, `SIGTERM`) and zero-downtime reloads
-  (`SIGHUP`).
+- **Signal Handling**: Manages graceful shutdowns (`SIGINT`, `SIGTERM`, `SIGUSR2`), zero-downtime
+  reloads (`SIGHUP`), and keeps `SIGQUIT` mapped to `process.abort()` for core dumps.
 - **Fastify Initialization**: Creates the server instance with standard configurations (like
   `proxiable` and `autoshutdown`).
 
@@ -65,9 +65,9 @@ properties:
 - `http2`: Enable HTTP/2 support (boolean).
 - `rewrite`: An object map for URL rewriting.
 - `sleep`: Options for `@ynode/autoshutdown`.
-- `listen`: The binding address/port string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or
-  a Unix socket path. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or
-  `{ path: "/tmp/app.sock" }`.
+- `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`,
+  `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object
+  like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to
   `{ retries: 5, delay: 15000 }`.
 

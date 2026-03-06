@@ -29,7 +29,7 @@ export interface BootifyConfig extends Record<string, any> {
     http2?: boolean;
     rewrite?: Record<string, string>;
     sleep?: number | Record<string, any>;
-    listen?: string | ListenOptions;
+    listen?: string | number | ListenOptions;
     listenRetry?: ListenRetryOptions;
 }
 

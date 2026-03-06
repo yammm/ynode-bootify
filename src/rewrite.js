@@ -23,9 +23,8 @@ export function rewriteUrl(req, config) {
     const [pathname, ...queryParts] = req.url.split("?");
     const queryString = queryParts.length > 0 ? "?" + queryParts.join("?") : "";
 
-    const url = rewrite[pathname];
-    if (url) {
-        return url + queryString;
+    if (Object.hasOwn(rewrite, pathname) && typeof rewrite[pathname] === "string") {
+        return rewrite[pathname] + queryString;
     }
 
     return req.url;
