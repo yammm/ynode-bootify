@@ -41,6 +41,9 @@ import { start } from "./worker.js";
 // logging
 import ylog from "@ynode/ylog";
 
+const BOOTIFY_ONCE_ERROR = "bootify() can only be called once per process.";
+let bootifyStarted = false;
+
 function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -75,8 +78,13 @@ function validateHooks(hooks) {
  * @param {object} [options.pkg] - Optional package.json object, default is to load from `${process.cwd()}/package.json`.
  * @param {function} [options.validator] - Optional function to validate `config` before starting.
  * @param {object} [options.hooks] - Optional lifecycle hooks.
+ * @param {object} [options._internal] - Internal test hooks.
  */
-export async function bootify({ app, config, pkg, validator, hooks }) {
+export async function bootify({ app, config, pkg, validator, hooks, _internal = {} }) {
+    const processTarget = _internal.process ?? process;
+    const runFn = _internal.run ?? run;
+    const ylogFn = _internal.ylog ?? ylog;
+
     assertFunction(app, "app");
     assertObject(config, "config");
 
@@ -92,6 +100,11 @@ export async function bootify({ app, config, pkg, validator, hooks }) {
         validateHooks(hooks);
     }
 
+    if (bootifyStarted) {
+        throw new Error(BOOTIFY_ONCE_ERROR);
+    }
+    bootifyStarted = true;
+
     if (validator) {
         await validator(config);
     }
@@ -102,13 +115,13 @@ export async function bootify({ app, config, pkg, validator, hooks }) {
     }
 
     // logging
-    const log = ylog(import.meta, { pid: true });
+    const log = ylogFn(import.meta, { pid: true });
 
     // terminate with core dump
-    process.on("SIGQUIT", process.abort);
+    processTarget.on("SIGQUIT", process.abort);
 
     // bye bye
-    process.on("exit", (code) => {
+    processTarget.on("exit", (code) => {
         log.info(`Sayonara. Exit code: ${code}`);
     });
 
@@ -119,7 +132,7 @@ export async function bootify({ app, config, pkg, validator, hooks }) {
     }
 
     // main
-    const manager = await run(
+    const manager = await runFn(
         async () => start({ app, config, log, pkg, hooks }),
         { ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }) },
         log,
@@ -127,7 +140,7 @@ export async function bootify({ app, config, pkg, validator, hooks }) {
 
     // trigger zero-downtime reload
     if (manager && manager.reload) {
-        process.on("SIGHUP", manager.reload);
+        processTarget.on("SIGHUP", manager.reload);
     }
 
     return manager;
