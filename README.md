@@ -63,7 +63,8 @@ properties:
 - `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object).
 - `pidfile`: Path to write the PID file (optional).
 - `http2`: Enable HTTP/2 support (boolean).
-- `rewrite`: An object map for URL rewriting.
+- `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be
+  strings. Non-string values are ignored.
 - `sleep`: Options for `@ynode/autoshutdown`.
 - `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`,
   `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object
@@ -94,6 +95,21 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 | `pkg`       | `Object`   | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted).                                                      |
 | `validator` | `Function` | Optional function to validate `config` before starting.                                                                                         |
 | `hooks`     | `Object`   | Optional lifecycle hooks: `onBeforeListen`, `onAfterListen`, and `onShutdown`.                                                                  |
+
+#### Hook Contexts
+
+- `onBeforeListen(context)`: Receives `{ fastify, config, pkg }`.
+- `onAfterListen(context)`: Receives `{ fastify, config, pkg, address }`.
+- `onShutdown(context)`: Receives `{ fastify, config, pkg, signal }`.
+
+#### Return Value
+
+`bootify(options)` resolves to one of:
+
+- `void`: when clustering is disabled or executing in a worker process.
+- `BootifyManager`: when running as clustered master, with:
+- `reload(): Promise<void>` for zero-downtime reload.
+- `getMetrics()` for cluster worker/load metrics.
 
 ## License
 

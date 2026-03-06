@@ -27,3 +27,9 @@ test("rewriteUrl supports own empty-string rewrite targets", () => {
 
     assert.strictEqual(result, "?a=1");
 });
+
+test("rewriteUrl ignores non-string rewrite targets", () => {
+    const result = rewriteUrl({ url: "/foo?a=1" }, { rewrite: { "/foo": 42 } });
+
+    assert.strictEqual(result, "/foo?a=1");
+});

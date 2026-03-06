@@ -105,3 +105,95 @@ test("start closes server and disposes listeners when app bootstrap fails", asyn
     assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
     assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
 });
+
+test("start closes server when onBeforeListen hook throws", async () => {
+    const signalTarget = new EventEmitter();
+    const fastify = createFastifyStub();
+    const startupError = new Error("before-listen failed");
+    const shutdownSignals = [];
+    let listenCalls = 0;
+
+    await assert.rejects(
+        () =>
+            start({
+                app: async () => async () => {},
+                config: { listen: 0, environment: "test" },
+                log: fastify.log,
+                pkg: { name: "test", version: "1.0.0" },
+                hooks: {
+                    onBeforeListen: async () => {
+                        throw startupError;
+                    },
+                    onShutdown: ({ signal }) => {
+                        shutdownSignals.push(signal);
+                    },
+                },
+                _internal: {
+                    createServer: async () => fastify,
+                    listen: async () => {
+                        listenCalls += 1;
+                    },
+                    createLifecycleController: (context) =>
+                        createLifecycleController({
+                            ...context,
+                            signalTarget,
+                            worker: null,
+                        }),
+                },
+            }),
+        startupError,
+    );
+
+    assert.strictEqual(listenCalls, 0);
+    assert.strictEqual(fastify.closeCalls, 1);
+    assert.deepStrictEqual(shutdownSignals, ["startup-error"]);
+    assert.strictEqual(signalTarget.listenerCount("SIGINT"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
+});
+
+test("start closes server when onAfterListen hook throws", async () => {
+    const signalTarget = new EventEmitter();
+    const fastify = createFastifyStub();
+    const startupError = new Error("after-listen failed");
+    const shutdownSignals = [];
+    let listenCalls = 0;
+
+    await assert.rejects(
+        () =>
+            start({
+                app: async () => async () => {},
+                config: { listen: 0, environment: "test" },
+                log: fastify.log,
+                pkg: { name: "test", version: "1.0.0" },
+                hooks: {
+                    onAfterListen: async () => {
+                        throw startupError;
+                    },
+                    onShutdown: ({ signal }) => {
+                        shutdownSignals.push(signal);
+                    },
+                },
+                _internal: {
+                    createServer: async () => fastify,
+                    listen: async () => {
+                        listenCalls += 1;
+                    },
+                    createLifecycleController: (context) =>
+                        createLifecycleController({
+                            ...context,
+                            signalTarget,
+                            worker: null,
+                        }),
+                },
+            }),
+        startupError,
+    );
+
+    assert.strictEqual(listenCalls, 1);
+    assert.strictEqual(fastify.closeCalls, 1);
+    assert.deepStrictEqual(shutdownSignals, ["onAfterListen-error"]);
+    assert.strictEqual(signalTarget.listenerCount("SIGINT"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
+});

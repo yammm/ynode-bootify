@@ -39,12 +39,18 @@ export interface BootifyLifecycleContext {
     pkg: Record<string, any>;
 }
 
+export interface BootifyAfterListenContext extends BootifyLifecycleContext {
+    address: string;
+}
+
+export interface BootifyShutdownContext extends BootifyLifecycleContext {
+    signal: string;
+}
+
 export interface BootifyHooks {
     onBeforeListen?: (context: BootifyLifecycleContext) => Promise<void> | void;
-    onAfterListen?: (
-        context: BootifyLifecycleContext & { address: string },
-    ) => Promise<void> | void;
-    onShutdown?: (context: BootifyLifecycleContext & { signal: string }) => Promise<void> | void;
+    onAfterListen?: (context: BootifyAfterListenContext) => Promise<void> | void;
+    onShutdown?: (context: BootifyShutdownContext) => Promise<void> | void;
 }
 
 export interface BootOptions {
@@ -75,8 +81,27 @@ export interface BootOptions {
     hooks?: BootifyHooks;
 }
 
+export interface BootifyClusterMetrics {
+    workers: Array<Record<string, any>>;
+    totalLag: number;
+    avgLag: number;
+    workerCount: number;
+    maxWorkers: number;
+    minWorkers: number;
+    scaleUpThreshold: number;
+    scaleDownThreshold: number;
+    mode: string;
+}
+
+export interface BootifyManager {
+    getMetrics: () => BootifyClusterMetrics;
+    reload: () => Promise<void>;
+}
+
+export type BootifyResult = void | BootifyManager;
+
 /**
  * Initializes the application bootstrap process.
  * Handles clustering, signal traps, and starting the Fastify server.
  */
-export function bootify(options: BootOptions): Promise<any>;
+export function bootify(options: BootOptions): Promise<BootifyResult>;

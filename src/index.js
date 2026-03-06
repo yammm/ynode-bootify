@@ -84,6 +84,18 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
     const processTarget = _internal.process ?? process;
     const runFn = _internal.run ?? run;
     const ylogFn = _internal.ylog ?? ylog;
+    const isBootifyStartedFn = _internal.isBootifyStarted ?? (() => bootifyStarted);
+    const markBootifyStartedFn =
+        _internal.markBootifyStarted ??
+        (() => {
+            bootifyStarted = true;
+        });
+    const loadMkpidfileFn =
+        _internal.loadMkpidfile ??
+        (async () => {
+            const module = await import("mkpidfile");
+            return module.default;
+        });
 
     assertFunction(app, "app");
     assertObject(config, "config");
@@ -100,10 +112,10 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
         validateHooks(hooks);
     }
 
-    if (bootifyStarted) {
+    if (isBootifyStartedFn()) {
         throw new Error(BOOTIFY_ONCE_ERROR);
     }
-    bootifyStarted = true;
+    markBootifyStartedFn();
 
     if (validator) {
         await validator(config);
@@ -127,7 +139,7 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
 
     // mkpidfile  module
     if (config.pidfile) {
-        const { default: mkpidfile } = await import("mkpidfile");
+        const mkpidfile = _internal.mkpidfile ?? (await loadMkpidfileFn());
         mkpidfile(config.pidfile);
     }
 

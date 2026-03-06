@@ -89,3 +89,12 @@ test("createServer registers autoshutdown only for worker processes", async () =
         await fastify.close();
     });
 });
+
+test("createServer enables HTTP/2 server when configured", async () => {
+    await withWorkerFlag(false, async () => {
+        const fastify = await createServer({ http2: true }, createLogStub());
+        await fastify.ready();
+        assert.strictEqual(fastify.server.constructor.name, "Http2Server");
+        await fastify.close();
+    });
+});
