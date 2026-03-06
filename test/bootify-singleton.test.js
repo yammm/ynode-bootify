@@ -134,3 +134,53 @@ test("bootify rejects concurrent call while startup is in progress", async () =>
     resolveRun({});
     await firstBoot;
 });
+
+test("bootify registers SIGQUIT/exit and wires SIGHUP reload handler", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    let reloadCalls = 0;
+
+    await bootify({
+        app: async () => async () => {},
+        config: { cluster: true },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async () => ({
+                reload: async () => {
+                    reloadCalls += 1;
+                },
+            }),
+        },
+    });
+
+    assert.strictEqual(processTarget.listenerCount("SIGQUIT"), 1);
+    assert.strictEqual(processTarget.listenerCount("exit"), 1);
+    assert.strictEqual(processTarget.listenerCount("SIGHUP"), 1);
+
+    processTarget.emit("SIGHUP");
+    assert.strictEqual(reloadCalls, 1);
+});
+
+test("bootify skips SIGHUP wiring when manager has no reload method", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+
+    await bootify({
+        app: async () => async () => {},
+        config: { cluster: true },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async () => ({}),
+        },
+    });
+
+    assert.strictEqual(processTarget.listenerCount("SIGQUIT"), 1);
+    assert.strictEqual(processTarget.listenerCount("exit"), 1);
+    assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
+});
