@@ -37,7 +37,7 @@ async function listen(fastify, retries = 5, delay = 100) {
     const pkg = fastify.pkg;
 
     // Selective hearing
-    const [port, host = "127.0.0.1"] = String(config.listen || 3000)
+    const [port, host = "127.0.0.1"] = String(config.listen ?? 0)
         .split(":")
         .reverse();
     const listenConfig = !isNaN(port) ? { port: Number(port), host } : { path: port };
