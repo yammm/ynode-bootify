@@ -69,7 +69,6 @@
     "dependencies": {
         "@ynode/autoshutdown": "^1.2.1",
         "@ynode/cluster": "^1.2.3",
-        "@ynode/versionify": "^1.0.0",
         "@ynode/ylog": "^1.0.2",
         "mkpidfile": "^1.0.1",
         "proxiable": "^1.0.1"
