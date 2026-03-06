@@ -43,6 +43,32 @@ import { start } from "./worker.js";
 // logging
 import ylog from "@ynode/ylog";
 
+function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function assertFunction(value, name) {
+    if (typeof value !== "function") {
+        throw new TypeError(`Invalid "${name}" option. Expected a function.`);
+    }
+}
+
+function assertObject(value, name) {
+    if (!isObject(value)) {
+        throw new TypeError(`Invalid "${name}" option. Expected an object.`);
+    }
+}
+
+function validateHooks(hooks) {
+    assertObject(hooks, "hooks");
+
+    ["onBeforeListen", "onAfterListen", "onShutdown"].forEach((name) => {
+        if (hooks[name] !== undefined && typeof hooks[name] !== "function") {
+            throw new TypeError(`Invalid "hooks.${name}" option. Expected a function.`);
+        }
+    });
+}
+
 /**
  * Main entry point
  * @param {object} options
@@ -53,6 +79,21 @@ import ylog from "@ynode/ylog";
  * @param {object} [options.hooks] - Optional lifecycle hooks.
  */
 export async function bootify({ app, config, pkg, validator, hooks }) {
+    assertFunction(app, "app");
+    assertObject(config, "config");
+
+    if (pkg !== undefined) {
+        assertObject(pkg, "pkg");
+    }
+
+    if (validator !== undefined) {
+        assertFunction(validator, "validator");
+    }
+
+    if (hooks !== undefined) {
+        validateHooks(hooks);
+    }
+
     if (validator) {
         await validator(config);
     }

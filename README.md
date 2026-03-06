@@ -80,7 +80,8 @@ when running behind a proxy like Nginx over a socket.
 
 ### `bootify(options)`
 
-Initializes the application lifecycle.
+Initializes the application lifecycle. `bootify` validates option shapes early and throws
+`TypeError` for invalid input.
 
 #### Options
 
