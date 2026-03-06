@@ -34,7 +34,11 @@ export async function createServer(config, log) {
 
     // register plugins
     if (cluster.isWorker) {
-        fastify.register(autoshutdown, { sleep: config.sleep, reportLoad: true });
+        const autoShutdownOptions = { reportLoad: true };
+        if (config.sleep !== undefined) {
+            autoShutdownOptions.sleep = config.sleep;
+        }
+        fastify.register(autoshutdown, autoShutdownOptions);
     }
 
     // use proxiable to handle common issues with unix domain sockets
