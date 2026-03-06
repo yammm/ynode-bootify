@@ -100,3 +100,26 @@ test("createLifecycleController dispose removes signal listeners", () => {
     assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
     assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
 });
+
+test("createLifecycleController still closes fastify when onShutdown hook throws", async () => {
+    const signalTarget = new EventEmitter();
+    const fastify = createFastifyDouble();
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onShutdown: () => {
+                throw new Error("hook-failed");
+            },
+        },
+        signalTarget,
+        worker: null,
+    });
+
+    await assert.rejects(() => controller.gracefulShutdown("SIGTERM"), /hook-failed/);
+    assert.strictEqual(fastify.closeCalls, 1);
+
+    controller.dispose();
+});

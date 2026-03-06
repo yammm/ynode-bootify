@@ -229,10 +229,33 @@ export function createLifecycleController({
     const gracefulShutdown = async (signal) => {
         if (!shutdownPromise) {
             shutdownPromise = (async () => {
+                let hookError = null;
                 if (typeof hooks.onShutdown === "function") {
-                    await hooks.onShutdown({ ...lifecycleContext, signal });
+                    try {
+                        await hooks.onShutdown({ ...lifecycleContext, signal });
+                    } catch (ex) {
+                        hookError = ex;
+                    }
                 }
-                await fastify.close();
+
+                let closeError = null;
+                try {
+                    await fastify.close();
+                } catch (ex) {
+                    closeError = ex;
+                }
+
+                if (hookError && closeError) {
+                    throw new AggregateError([hookError, closeError], "Multiple shutdown errors.");
+                }
+
+                if (hookError) {
+                    throw hookError;
+                }
+
+                if (closeError) {
+                    throw closeError;
+                }
             })();
         }
         return shutdownPromise;
@@ -298,10 +321,16 @@ export function createLifecycleController({
  * @param {object} context.log - Logger instance
  * @param {object} context.pkg - Package.json content
  * @param {object} [context.hooks] - Optional lifecycle hooks
+ * @param {object} [context._internal] - Internal test hooks
  */
-export async function start({ app, config, log, pkg, hooks = {} }) {
+export async function start({ app, config, log, pkg, hooks = {}, _internal = {} }) {
+    const createServerFn = _internal.createServer ?? createServer;
+    const listenFn = _internal.listen ?? listen;
+    const lifecycleControllerFactory =
+        _internal.createLifecycleController ?? createLifecycleController;
+
     // create the server instance by calling the factory function
-    const fastify = await createServer(config, log);
+    const fastify = await createServerFn(config, log);
 
     // decorate the fastify instance with config for access in routes
     fastify.decorate("config", config);
@@ -324,7 +353,7 @@ export async function start({ app, config, log, pkg, hooks = {} }) {
         await hooks.onBeforeListen(lifecycleContext);
     }
 
-    const controller = createLifecycleController({ fastify, config, pkg, hooks });
+    const controller = lifecycleControllerFactory({ fastify, config, pkg, hooks });
     const { gracefulShutdown, dispose } = controller;
 
     fastify.addHook("onClose", async () => {
@@ -332,17 +361,28 @@ export async function start({ app, config, log, pkg, hooks = {} }) {
     });
 
     const retry = resolveListenRetry(config);
-    await listen(fastify, retry.retries, retry.delay);
+    try {
+        await listenFn(fastify, retry.retries, retry.delay);
 
-    if (typeof hooks.onAfterListen === "function") {
-        try {
-            await hooks.onAfterListen({
-                ...lifecycleContext,
-                address: resolveListenAddress(fastify.server),
-            });
-        } catch (ex) {
-            await gracefulShutdown("onAfterListen-error");
-            throw ex;
+        if (typeof hooks.onAfterListen === "function") {
+            try {
+                await hooks.onAfterListen({
+                    ...lifecycleContext,
+                    address: resolveListenAddress(fastify.server),
+                });
+            } catch (ex) {
+                await gracefulShutdown("onAfterListen-error");
+                throw ex;
+            }
         }
+    } catch (ex) {
+        try {
+            await gracefulShutdown("startup-error");
+        } catch (shutdownEx) {
+            fastify.log.error(shutdownEx, "Error during startup cleanup.");
+        } finally {
+            dispose();
+        }
+        throw ex;
     }
 }
