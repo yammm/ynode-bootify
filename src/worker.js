@@ -29,6 +29,22 @@ async function retryOperation(operation, { retries = 5, delay = 100, onRetry } =
     }
 }
 
+function resolveAppPlugin(appResult) {
+    let appPlugin = appResult;
+
+    if (appPlugin && typeof appPlugin === "object" && Object.hasOwn(appPlugin, "default")) {
+        appPlugin = appPlugin.default;
+    }
+
+    if (typeof appPlugin !== "function") {
+        throw new TypeError(
+            "Invalid app plugin. Expected app(fastify, config) to return a Fastify plugin function or a module with a functional default export.",
+        );
+    }
+
+    return appPlugin;
+}
+
 function parsePort(port) {
     const portNumber = Number(port);
     if (!Number.isInteger(portNumber) || portNumber < 0 || portNumber > 65535) {
@@ -273,10 +289,7 @@ export async function start({ app, config, log, pkg, hooks = {} }) {
     fastify.decorate("clusterCount", 1);
 
     // resolve app plugin
-    let appPlugin = await app(fastify, config);
-    if (appPlugin && typeof appPlugin === "object" && appPlugin.default) {
-        appPlugin = appPlugin.default;
-    }
+    const appPlugin = resolveAppPlugin(await app(fastify, config));
 
     // register the main application logic from app.js
     fastify.register(appPlugin);

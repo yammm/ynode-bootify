@@ -85,13 +85,13 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 
 #### Options
 
-| Property    | Type       | Description                                                                                                |
-| :---------- | :--------- | :--------------------------------------------------------------------------------------------------------- |
-| `app`       | `Function` | A function called as `app(fastify, config)` that returns either a Fastify plugin or module with `default`. |
-| `config`    | `Object`   | The configuration object (usually from `argv`).                                                            |
-| `pkg`       | `Object`   | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted).                 |
-| `validator` | `Function` | Optional function to validate `config` before starting.                                                    |
-| `hooks`     | `Object`   | Optional lifecycle hooks: `onBeforeListen`, `onAfterListen`, and `onShutdown`.                             |
+| Property    | Type       | Description                                                                                                                                     |
+| :---------- | :--------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app`       | `Function` | A function called as `app(fastify, config)` that returns either a Fastify plugin or module with `default`; invalid returns throw a `TypeError`. |
+| `config`    | `Object`   | The configuration object (usually from `argv`).                                                                                                 |
+| `pkg`       | `Object`   | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted).                                                      |
+| `validator` | `Function` | Optional function to validate `config` before starting.                                                                                         |
+| `hooks`     | `Object`   | Optional lifecycle hooks: `onBeforeListen`, `onAfterListen`, and `onShutdown`.                                                                  |
 
 ## License
 
