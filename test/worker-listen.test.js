@@ -35,6 +35,27 @@ test("parseListenConfig parses windows drive-letter paths", () => {
     });
 });
 
+test("parseListenConfig parses object listen config with port and host", () => {
+    assert.deepStrictEqual(parseListenConfig({ port: 8080, host: "0.0.0.0" }), {
+        port: 8080,
+        host: "0.0.0.0",
+    });
+});
+
+test("parseListenConfig parses object listen config with default host", () => {
+    assert.deepStrictEqual(parseListenConfig({ port: 3000 }), {
+        port: 3000,
+        host: "127.0.0.1",
+    });
+});
+
+test("parseListenConfig parses object listen config with path and options", () => {
+    assert.deepStrictEqual(parseListenConfig({ path: "/tmp/app.sock", readableAll: true }), {
+        path: "/tmp/app.sock",
+        readableAll: true,
+    });
+});
+
 test("parseListenConfig rejects malformed host:port", () => {
     assert.throws(
         () => parseListenConfig("localhost:abc"),
@@ -46,5 +67,19 @@ test("parseListenConfig rejects unbracketed IPv6 with port", () => {
     assert.throws(
         () => parseListenConfig("::1:8080"),
         /Expected "host:port" or "\[ipv6\]:port" when using colons\./,
+    );
+});
+
+test("parseListenConfig rejects invalid listen object shape", () => {
+    assert.throws(
+        () => parseListenConfig({ host: "127.0.0.1" }),
+        /Expected either \{"path": "\.\.\."\} or \{"port": number, "host"\?: string\}\./,
+    );
+});
+
+test("parseListenConfig rejects listen object with path and port together", () => {
+    assert.throws(
+        () => parseListenConfig({ path: "/tmp/app.sock", port: 3000 }),
+        /"path" cannot be combined with "host" or "port"\./,
     );
 });

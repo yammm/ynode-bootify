@@ -41,6 +41,17 @@ bootify({
     pkg,
     // Lazy-load your application logic
     app: () => import("./app.js"),
+    hooks: {
+        onBeforeListen: async ({ fastify }) => {
+            fastify.log.info("Preparing to listen...");
+        },
+        onAfterListen: async ({ address }) => {
+            console.log(`Listening at ${address}`);
+        },
+        onShutdown: async ({ signal }) => {
+            console.log(`Shutdown triggered by ${signal}`);
+        },
+    },
 });
 ```
 
@@ -55,7 +66,8 @@ properties:
 - `rewrite`: An object map for URL rewriting.
 - `sleep`: Options for `@ynode/autoshutdown`.
 - `listen`: The binding address/port string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or
-  a Unix socket path.
+  a Unix socket path. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or
+  `{ path: "/tmp/app.sock" }`.
 
 ### Unix Domain Sockets & `proxiable`
 
@@ -78,6 +90,7 @@ Initializes the application lifecycle.
 | `config`    | `Object`   | The configuration object (usually from `argv`).                                                            |
 | `pkg`       | `Object`   | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted).                 |
 | `validator` | `Function` | Optional function to validate `config` before starting.                                                    |
+| `hooks`     | `Object`   | Optional lifecycle hooks: `onBeforeListen`, `onAfterListen`, and `onShutdown`.                             |
 
 ## License
 

@@ -7,6 +7,20 @@ import { FastifyInstance, FastifyPluginAsync } from "fastify";
 type AppModule = { default: FastifyPluginAsync };
 type AppPlugin = FastifyPluginAsync | AppModule;
 
+export interface BootifyLifecycleContext {
+    fastify: FastifyInstance;
+    config: Record<string, any>;
+    pkg: Record<string, any>;
+}
+
+export interface BootifyHooks {
+    onBeforeListen?: (context: BootifyLifecycleContext) => Promise<void> | void;
+    onAfterListen?: (
+        context: BootifyLifecycleContext & { address: string },
+    ) => Promise<void> | void;
+    onShutdown?: (context: BootifyLifecycleContext & { signal: string }) => Promise<void> | void;
+}
+
 export interface BootOptions {
     /**
      * A function that imports and returns the application entry point.
@@ -28,6 +42,11 @@ export interface BootOptions {
      * Optional validation function for configuration.
      */
     validator?: (config: Record<string, any>) => Promise<void> | void;
+
+    /**
+     * Optional lifecycle hooks that run around listen/shutdown.
+     */
+    hooks?: BootifyHooks;
 }
 
 /**

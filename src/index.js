@@ -50,8 +50,9 @@ import ylog from "@ynode/ylog";
  * @param {object} options.config - The configuration object (argv).
  * @param {object} [options.pkg] - Optional package.json object, default is to load from `${process.cwd()}/package.json`.
  * @param {function} [options.validator] - Optional function to validate `config` before starting.
+ * @param {object} [options.hooks] - Optional lifecycle hooks.
  */
-export async function bootify({ app, config, pkg, validator }) {
+export async function bootify({ app, config, pkg, validator, hooks }) {
     if (validator) {
         await validator(config);
     }
@@ -80,7 +81,7 @@ export async function bootify({ app, config, pkg, validator }) {
 
     // main
     const manager = await run(
-        async () => start({ app, config, log, pkg }),
+        async () => start({ app, config, log, pkg, hooks }),
         { ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }) },
         log,
     );

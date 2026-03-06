@@ -4,6 +4,13 @@
     "description": "A standardized Fastify application bootstrapper with built-in cluster management, graceful shutdown, and configuration wiring for the @ynode ecosystem.",
     "main": "src/index.js",
     "types": "index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./index.d.ts",
+            "import": "./src/index.js",
+            "default": "./src/index.js"
+        }
+    },
     "type": "module",
     "license": "MIT",
     "author": "Michael Welter <me@mikinho.com>",

@@ -51,7 +51,51 @@ function isSocketPath(value) {
     );
 }
 
+function parseListenObject(listen) {
+    const hasPath = listen.path !== undefined && listen.path !== null;
+    const hasPort = listen.port !== undefined && listen.port !== null;
+    const hasHost = listen.host !== undefined && listen.host !== null;
+
+    if (hasPath && (hasPort || hasHost)) {
+        throw new Error(
+            'Invalid listen config object: "path" cannot be combined with "host" or "port".',
+        );
+    }
+
+    const listenConfig = {};
+
+    if (hasPath) {
+        if (typeof listen.path !== "string" || listen.path.trim().length === 0) {
+            throw new Error("Invalid listen path. Expected a non-empty string.");
+        }
+        listenConfig.path = listen.path.trim();
+    } else if (hasPort) {
+        const host = hasHost ? String(listen.host).trim() : "127.0.0.1";
+        if (host.length === 0) {
+            throw new Error("Invalid listen host. Expected a non-empty string.");
+        }
+        listenConfig.host = host;
+        listenConfig.port = parsePort(listen.port);
+    } else {
+        throw new Error(
+            'Invalid listen config object. Expected either {"path": "..."} or {"port": number, "host"?: string}.',
+        );
+    }
+
+    ["backlog", "readableAll", "writableAll", "ipv6Only", "exclusive"].forEach((key) => {
+        if (listen[key] !== undefined) {
+            listenConfig[key] = listen[key];
+        }
+    });
+
+    return listenConfig;
+}
+
 export function parseListenConfig(listen) {
+    if (listen && typeof listen === "object" && !Array.isArray(listen)) {
+        return parseListenObject(listen);
+    }
+
     const value = String(listen ?? 0).trim();
 
     if (value.length === 0) {
@@ -117,6 +161,20 @@ async function listen(fastify, retries = 5, delay = 100) {
     }
 }
 
+function resolveListenAddress(server) {
+    const address = server.address();
+    if (typeof address === "string") {
+        return address;
+    }
+    if (!address || typeof address !== "object") {
+        return "";
+    }
+    if (address.family === "IPv6") {
+        return `[${address.address}]:${address.port}`;
+    }
+    return `${address.address}:${address.port}`;
+}
+
 /**
  * Start the worker process
  * @param {object} context
@@ -124,8 +182,9 @@ async function listen(fastify, retries = 5, delay = 100) {
  * @param {object} context.config - The configuration object
  * @param {object} context.log - Logger instance
  * @param {object} context.pkg - Package.json content
+ * @param {object} [context.hooks] - Optional lifecycle hooks
  */
-export async function start({ app, config, log, pkg }) {
+export async function start({ app, config, log, pkg, hooks = {} }) {
     // create the server instance by calling the factory function
     const fastify = await createServer(config, log);
 
@@ -147,10 +206,33 @@ export async function start({ app, config, log, pkg }) {
     // register the main application logic from app.js
     fastify.register(appPlugin);
 
+    const lifecycleContext = { fastify, config, pkg };
+
+    if (typeof hooks.onBeforeListen === "function") {
+        await hooks.onBeforeListen(lifecycleContext);
+    }
+
+    let shutdownPromise = null;
+    const gracefulShutdown = async (signal) => {
+        if (!shutdownPromise) {
+            shutdownPromise = (async () => {
+                if (typeof hooks.onShutdown === "function") {
+                    await hooks.onShutdown({ ...lifecycleContext, signal });
+                }
+                await fastify.close();
+            })();
+        }
+        return shutdownPromise;
+    };
+
     // setup signal handlers so process exit event can be triggered
     ["SIGINT", "SIGTERM", "SIGUSR2"].forEach((signal) =>
-        process.on(signal, async (s) => {
-            await fastify.close();
+        process.on(signal, async () => {
+            try {
+                await gracefulShutdown(signal);
+            } catch (ex) {
+                fastify.log.error(ex, `Error during shutdown after ${signal}`);
+            }
         }),
     );
 
@@ -162,7 +244,11 @@ export async function start({ app, config, log, pkg }) {
             }
             switch (msg) {
                 case "shutdown": {
-                    await fastify.close();
+                    try {
+                        await gracefulShutdown("shutdown");
+                    } catch (ex) {
+                        fastify.log.error(ex, "Error during shutdown command handling");
+                    }
                     break;
                 }
             }
@@ -173,4 +259,16 @@ export async function start({ app, config, log, pkg }) {
     }
 
     await listen(fastify, 5, 15000);
+
+    if (typeof hooks.onAfterListen === "function") {
+        try {
+            await hooks.onAfterListen({
+                ...lifecycleContext,
+                address: resolveListenAddress(fastify.server),
+            });
+        } catch (ex) {
+            await gracefulShutdown("onAfterListen-error");
+            throw ex;
+        }
+    }
 }
