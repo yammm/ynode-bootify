@@ -22,15 +22,17 @@
 # SOFTWARE.
 #
 
-GIT_DIR=$(git rev-parse --git-dir)
+GIT_DIR="$(git rev-parse --git-dir)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-if [[ ! -n ${GIT_DIR} ]]
+if [[ -z "${GIT_DIR}" ]]
 then
-    echo "ERROR: Folder '$(PWD)' not part of a working git tree"
+    echo "ERROR: Folder '$(pwd)' not part of a working git tree"
     exit 1
 fi;
 
-for file in $(dirname $0)/hooks/*
+for file in "${SCRIPT_DIR}"/hooks/*
 do
-    ln -fv ${file} ${GIT_DIR}/hooks
+    [[ -e "${file}" ]] || continue
+    ln -fv "${file}" "${GIT_DIR}/hooks"
 done
