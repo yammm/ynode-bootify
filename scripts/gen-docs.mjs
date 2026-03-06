@@ -36,6 +36,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import process from "node:process";
 
 /**
@@ -45,7 +46,8 @@ import process from "node:process";
  * @property {Object} pkg Parsed package.json contents.
  */
 const pkgPath = resolve(process.cwd(), "package.json");
-const pkg = (await import(pkgPath, { with: { type: "json" } })).default;
+const pkgUrl = pathToFileURL(pkgPath).href;
+const pkg = (await import(pkgUrl, { with: { type: "json" } })).default;
 
 /**
  * Extracts metadata from the project's package.json for documentation generation.
