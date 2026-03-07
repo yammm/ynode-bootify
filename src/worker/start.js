@@ -35,7 +35,8 @@ function resolveAppPlugin(appResult) {
 export async function start({ app, config, log, pkg, hooks = {}, _internal = {} }) {
     const createServerFn = _internal.createServer ?? createServer;
     const listenFn = _internal.listen ?? listen;
-    const lifecycleControllerFactory = _internal.createLifecycleController ?? createLifecycleController;
+    const lifecycleControllerFactory =
+        _internal.createLifecycleController ?? createLifecycleController;
 
     // create the server instance by calling the factory function
     const fastify = await createServerFn(config, log);

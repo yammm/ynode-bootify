@@ -8,7 +8,10 @@ test("rewriteUrl returns original URL when config is missing", () => {
 });
 
 test("rewriteUrl rewrites own mapped paths and preserves query string", () => {
-    const result = rewriteUrl({ url: "/api/users?page=2&limit=10" }, { rewrite: { "/api/users": "/v1/users" } });
+    const result = rewriteUrl(
+        { url: "/api/users?page=2&limit=10" },
+        { rewrite: { "/api/users": "/v1/users" } },
+    );
 
     assert.strictEqual(result, "/v1/users?page=2&limit=10");
 });

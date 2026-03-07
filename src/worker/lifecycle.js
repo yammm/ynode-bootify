@@ -86,7 +86,10 @@ export function createLifecycleController({
                 if (Number.isInteger(msg.count) && msg.count > 0) {
                     fastify.clusterCount = msg.count;
                 } else {
-                    fastify.log.warn({ count: msg.count }, "Ignoring invalid cluster-count message payload.");
+                    fastify.log.warn(
+                        { count: msg.count },
+                        "Ignoring invalid cluster-count message payload.",
+                    );
                 }
             }
 

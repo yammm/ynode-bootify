@@ -81,16 +81,18 @@ function validateHooks(hooks) {
  * @param {object} [options.hooks] - Optional lifecycle hooks.
  * @param {object} [options._internal] - Internal test hooks.
  */
-export async function bootify({ app, config, pkg, validator, hooks, _internal = {} }) {
+export async function bootify({ app, config, pkg, tty, validator, hooks, _internal = {} }) {
     const processTarget = _internal.process ?? process;
     const runFn = _internal.run ?? run;
     const ylogFn = _internal.ylog ?? ylog;
     const getBootifyStateFn = _internal.getBootifyState ?? (() => bootifyState);
+
     const setBootifyStateFn =
         _internal.setBootifyState ??
         ((nextState) => {
             bootifyState = nextState;
         });
+
     const loadMkpidfileFn =
         _internal.loadMkpidfile ??
         (async () => {
@@ -160,12 +162,17 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
             mkpidfile(config.pidfile);
         }
 
+        const runOptions = {
+            ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }),
+        };
+        if (tty !== undefined) {
+            runOptions.tty = tty;
+        }
+
         // main
         const manager = await runFn(
             async () => start({ app, config, log, pkg, hooks }),
-            {
-                ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }),
-            },
+            runOptions,
             log,
         );
 

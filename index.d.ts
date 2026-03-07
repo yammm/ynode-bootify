@@ -130,9 +130,18 @@ export interface BootifyManager {
     getMetrics: () => BootifyClusterMetrics;
     reload: () => Promise<void>;
     close: () => Promise<void>;
-    on: (eventName: BootifyClusterEventName, listener: (event: BootifyClusterEvent) => void) => BootifyManager;
-    once: (eventName: BootifyClusterEventName, listener: (event: BootifyClusterEvent) => void) => BootifyManager;
-    off: (eventName: BootifyClusterEventName, listener: (event: BootifyClusterEvent) => void) => BootifyManager;
+    on: (
+        eventName: BootifyClusterEventName,
+        listener: (event: BootifyClusterEvent) => void,
+    ) => BootifyManager;
+    once: (
+        eventName: BootifyClusterEventName,
+        listener: (event: BootifyClusterEvent) => void,
+    ) => BootifyManager;
+    off: (
+        eventName: BootifyClusterEventName,
+        listener: (event: BootifyClusterEvent) => void,
+    ) => BootifyManager;
 }
 
 export type BootifyResult = void | BootifyManager;

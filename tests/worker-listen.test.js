@@ -58,11 +58,17 @@ test("parseListenConfig parses object listen config with path and options", () =
 });
 
 test("parseListenConfig rejects invalid listen backlog option", () => {
-    assert.throws(() => parseListenConfig({ port: 3000, backlog: -1 }), /Invalid "listen\.backlog" option/);
+    assert.throws(
+        () => parseListenConfig({ port: 3000, backlog: -1 }),
+        /Invalid "listen\.backlog" option/,
+    );
 });
 
 test("parseListenConfig rejects non-boolean listen flag options", () => {
-    assert.throws(() => parseListenConfig({ port: 3000, readableAll: "yes" }), /Invalid "listen\.readableAll" option/);
+    assert.throws(
+        () => parseListenConfig({ port: 3000, readableAll: "yes" }),
+        /Invalid "listen\.readableAll" option/,
+    );
 });
 
 test("parseListenConfig rejects malformed host:port", () => {
@@ -73,7 +79,10 @@ test("parseListenConfig rejects malformed host:port", () => {
 });
 
 test("parseListenConfig rejects unbracketed IPv6 with port", () => {
-    assert.throws(() => parseListenConfig("::1:8080"), /Expected "host:port" or "\[ipv6\]:port" when using colons\./);
+    assert.throws(
+        () => parseListenConfig("::1:8080"),
+        /Expected "host:port" or "\[ipv6\]:port" when using colons\./,
+    );
 });
 
 test("parseListenConfig rejects invalid listen object shape", () => {
@@ -116,9 +125,15 @@ test("resolveListenRetry rejects non-object config", () => {
 });
 
 test("resolveListenRetry rejects invalid retries", () => {
-    assert.throws(() => resolveListenRetry({ listenRetry: { retries: 0 } }), /Invalid "listenRetry\.retries" option/);
+    assert.throws(
+        () => resolveListenRetry({ listenRetry: { retries: 0 } }),
+        /Invalid "listenRetry\.retries" option/,
+    );
 });
 
 test("resolveListenRetry rejects invalid delay", () => {
-    assert.throws(() => resolveListenRetry({ listenRetry: { delay: -1 } }), /Invalid "listenRetry\.delay" option/);
+    assert.throws(
+        () => resolveListenRetry({ listenRetry: { delay: -1 } }),
+        /Invalid "listenRetry\.delay" option/,
+    );
 });

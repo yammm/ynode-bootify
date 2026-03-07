@@ -36,12 +36,24 @@ import globals from "globals";
 
 export default defineConfig([
     {
-        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: [
+            "CHANGELOG.md",
+            "**/node_modules/**",
+            "**/*.min.js",
+            "**/package-lock.json",
+            "**/docs/**",
+        ],
         linterOptions: { reportUnusedDisableDirectives: true },
     },
     {
         files: ["**/js/*.js"],
-        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: [
+            "CHANGELOG.md",
+            "**/node_modules/**",
+            "**/*.min.js",
+            "**/package-lock.json",
+            "**/docs/**",
+        ],
         plugins: { js, prettier: pluginPrettier, "simple-import-sort": simpleImportSort },
         extends: ["js/recommended"],
         languageOptions: {
@@ -114,7 +126,13 @@ export default defineConfig([
     },
     {
         files: ["**/*.json"],
-        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: [
+            "CHANGELOG.md",
+            "**/node_modules/**",
+            "**/*.min.js",
+            "**/package-lock.json",
+            "**/docs/**",
+        ],
         plugins: { json },
         language: "json/json",
         extends: ["json/recommended"],
@@ -131,7 +149,13 @@ export default defineConfig([
     {
         // eslint-config-prettier turns off `curly`, but we want to strictly enforce it
         files: ["**/*.{js,mjs,cjs}"],
-        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: [
+            "CHANGELOG.md",
+            "**/node_modules/**",
+            "**/*.min.js",
+            "**/package-lock.json",
+            "**/docs/**",
+        ],
         rules: {
             curly: ["error", "all"],
             "brace-style": ["error", "1tbs", { allowSingleLine: false }],

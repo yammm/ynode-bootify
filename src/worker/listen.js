@@ -30,7 +30,9 @@ function parseListenObject(listen) {
     const hasHost = listen.host !== undefined && listen.host !== null;
 
     if (hasPath && (hasPort || hasHost)) {
-        throw new Error('Invalid listen config object: "path" cannot be combined with "host" or "port".');
+        throw new Error(
+            'Invalid listen config object: "path" cannot be combined with "host" or "port".',
+        );
     }
 
     const listenConfig = {};
@@ -102,10 +104,14 @@ export function parseListenConfig(listen) {
     }
 
     if (value.includes(":")) {
-        throw new Error(`Invalid listen address "${value}". Expected "host:port" or "[ipv6]:port" when using colons.`);
+        throw new Error(
+            `Invalid listen address "${value}". Expected "host:port" or "[ipv6]:port" when using colons.`,
+        );
     }
 
-    throw new Error(`Invalid listen value "${value}". Expected "port", "host:port", "[ipv6]:port", or socket path.`);
+    throw new Error(
+        `Invalid listen value "${value}". Expected "port", "host:port", "[ipv6]:port", or socket path.`,
+    );
 }
 
 export function resolveListenRetry(config = {}) {
@@ -167,7 +173,10 @@ export async function listen(fastify, retries = 5, delay = 100) {
             retries,
             delay,
             onRetry: (ex, attempt, nextDelay) => {
-                fastify.log.warn(`Attempt ${attempt} failed: ${ex.message}. Retrying in ${nextDelay}ms...`, ex);
+                fastify.log.warn(
+                    `Attempt ${attempt} failed: ${ex.message}. Retrying in ${nextDelay}ms...`,
+                    ex,
+                );
             },
         });
     } catch (ex) {
