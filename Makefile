@@ -1,28 +1,24 @@
-# Release helper
-# Usage: make release VERSION=1.0.0
-.PHONY: release check verify test lint docs clean
+.PHONY: help test lint format docs clean
 
-VERSION ?=
+help:
+	@echo "Available commands:"
+	@echo "  make test      Run the test suite via npm"
+	@echo "  make lint      Run ESLint via npm"
+	@echo "  make format    Run Prettier formatting via npm"
+	@echo "  make docs      Generate JSDoc via npm"
+	@echo "  make clean     Remove generated JSDoc directory via npm"
+
+test:
+	npm run test
+
+lint:
+	npm run lint
+
+format:
+	npm run format
 
 docs:
 	npm run docs
 
 clean:
 	npm run docs:clean
-
-lint:
-	npm run lint
-
-release: check verify
-	@if [ -z "$(VERSION)" ]; then echo "VERSION required"; exit 2; fi
-	npm version $(VERSION)
-	npm publish --access public
-
-verify: lint test docs
-
-check:
-	@command -v npm >/dev/null 2>&1 || { echo "npm not found"; exit 1; }
-	@if [ ! -f package.json ]; then echo "package.json missing"; exit 1; fi
-
-test:
-	npm run test
