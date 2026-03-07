@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #
-# Copyright (c) 2025 Michael Welter <me@mikinho.com>
+# Copyright (c) 2026 Michael Welter <me@mikinho.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,4 @@
 # Git pre-commit hook
 #
 
-set -euo pipefail
-
-staged_files=()
-while IFS= read -r -d '' file; do
-    staged_files+=("$file")
-done < <(git diff --cached --name-only --diff-filter=ACMRTUXB -z)
-
-if [[ ${#staged_files[@]} -eq 0 ]]; then
-    exit 0
-fi
-
-npx eslint --no-warn-ignored "${staged_files[@]}"
+npx eslint --no-warn-ignored $(git diff --cached --name-only --diff-filter=ACMRTUXB | tr '\n' ' ')

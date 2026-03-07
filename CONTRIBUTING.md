@@ -11,7 +11,14 @@ Before contributing, please securely install the local Git hooks which enforce c
 ./scripts/setup-hooks
 ```
 
-### Development Commands
+
+### Windows Users
+If you are developing on a Windows machine, please run the dedicated batch script:
+
+```cmd
+.\scripts\setup-hooks.cmd
+```
+\n### Development Commands
 
 ```bash
 # Run the standard test suite
