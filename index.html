@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Home</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Home</h1>
+
+    
+
+
+
+    
+
+
+    <h3> </h3>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    <section>
+        <article><h1>@ynode/bootify</h1>
+<p>Copyright (c) 2026 Michael Welter <a href="mailto:me@mikinho.com">me@mikinho.com</a></p>
+<p><a href="https://www.npmjs.com/package/@ynode/bootify"><img src="https://img.shields.io/npm/v/@ynode/bootify.svg" alt="npm version"></a> <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
+<p>A Fastify bootstrap plugin that incorporates standardized @ynode patterns for clustering, configuration, and lifecycle management.</p>
+<h2>Purpose</h2>
+<p><code>@ynode/bootify</code> eliminates the boilerplate code typically found in the entry points of <code>@ynode</code> applications. It consolidates:</p>
+<ul>
+<li><strong>Cluster Management</strong>: Automatically handles master/worker process forks using <code>@ynode/cluster</code>.</li>
+<li><strong>Signal Handling</strong>: Manages graceful shutdowns (<code>SIGINT</code>, <code>SIGTERM</code>, <code>SIGUSR2</code>), zero-downtime reloads (<code>SIGHUP</code>), and keeps <code>SIGQUIT</code> mapped to <code>process.abort()</code> for core dumps.</li>
+<li><strong>Fastify Initialization</strong>: Creates the server instance with standard configurations (like <code>proxiable</code> and <code>autoshutdown</code>).</li>
+</ul>
+<h2>Installation</h2>
+<pre class="prettyprint source lang-sh"><code>npm install @ynode/bootify
+</code></pre>
+<h2>Usage</h2>
+<p>In your main entry file (e.g., <code>src/web.js</code>), simply import <code>bootify</code> and your configuration.</p>
+<pre class="prettyprint source lang-javascript"><code>#!/usr/bin/env node
+
+import { bootify } from &quot;@ynode/bootify&quot;;
+import config from &quot;./config.js&quot;; // Your yargs configuration
+import pkg from &quot;../package.json&quot; with { type: &quot;json&quot; };
+
+try {
+    await bootify({
+        config,
+        pkg,
+        // Lazy-load your application logic
+        app: () => import(&quot;./app.js&quot;),
+        hooks: {
+            onBeforeListen: async ({ fastify }) => {
+                fastify.log.info(&quot;Preparing to listen...&quot;);
+            },
+            onAfterListen: async ({ address }) => {
+                console.log(`Listening at ${address}`);
+            },
+            onShutdown: async ({ signal }) => {
+                console.log(`Shutdown triggered by ${signal}`);
+            },
+        },
+    });
+} catch (ex) {
+    console.error(ex);
+    process.exitCode = 1;
+}
+</code></pre>
+<h3>Configuration Object (<code>config</code>)</h3>
+<p>The <code>config</code> object is typically the resolved output of <code>yargs</code>. It supports the following reserved properties:</p>
+<ul>
+<li><code>cluster</code>: Configuration for <code>@ynode/cluster</code> (can be a boolean or object). This object is passed through to <code>@ynode/cluster</code> options. When omitted, clustering defaults to enabled; set <code>cluster: false</code> to force single-process mode.</li>
+<li><code>pidfile</code>: Path to write the PID file (optional).</li>
+<li><code>http2</code>: Enable HTTP/2 support (boolean).</li>
+<li><code>trustProxy</code>: Forwarded/real client IP trust setting passed directly to Fastify <code>trustProxy</code>.</li>
+<li><code>rewrite</code>: An object map for URL rewriting. Keys are exact request paths and values must be strings. Non-string values are ignored.</li>
+<li><code>sleep</code>: Options for <code>@ynode/autoshutdown</code>.</li>
+<li><code>listen</code>: The binding address can be a number (<code>3000</code>), a string (e.g., <code>&quot;3000&quot;</code>, <code>&quot;127.0.0.1:8080&quot;</code>, <code>&quot;[::1]:8080&quot;</code>), or a Unix socket path string. You can also pass an object like <code>{ port: 3000, host: &quot;0.0.0.0&quot; }</code> or <code>{ path: &quot;/tmp/app.sock&quot; }</code>.</li>
+<li><code>listenRetry</code>: Optional startup retry policy <code>{ retries?: number, delay?: number }</code>. Defaults to <code>{ retries: 5, delay: 15000 }</code>.</li>
+</ul>
+<p>With <code>@ynode/cluster</code> <code>1.4.0+</code>, you can configure TTY command mode and reload commands via <code>cluster.tty</code>, for example:</p>
+<pre class="prettyprint source lang-js"><code>cluster: {
+  enabled: true,
+  tty: {
+    enabled: true,
+    commands: true,
+    reloadCommand: &quot;rl&quot;
+  }
+}
+</code></pre>
+<h3>Production Configuration Example</h3>
+<p>For a production deployment behind a reverse proxy, combine <code>trustProxy</code>, explicit <code>listen</code>, and a bounded <code>listenRetry</code> policy:</p>
+<pre class="prettyprint source lang-js"><code>{
+  trustProxy: true,
+  listen: { host: &quot;0.0.0.0&quot;, port: 8080, backlog: 511 },
+  listenRetry: { retries: 8, delay: 5000 }
+}
+</code></pre>
+<ul>
+<li><code>trustProxy: true</code> ensures <code>request.ip</code> respects forwarded headers.</li>
+<li>Explicit <code>listen</code> avoids accidental ephemeral port binding.</li>
+<li><code>listenRetry</code> helps absorb short dependency/network startup windows.</li>
+</ul>
+<h3>Unix Domain Sockets &amp; <code>proxiable</code></h3>
+<p>If you bind to a Unix Domain Socket by setting <code>listen</code> to a socket path (for example <code>&quot;/tmp/app.sock&quot;</code> or <code>{ path: &quot;/tmp/app.sock&quot; }</code>), <code>bootify</code> automatically uses <a href="https://www.npmjs.com/package/proxiable"><code>proxiable</code></a> on the raw server instance. This fixes common issues where <code>req.socket.remoteAddress</code> is undefined or incorrect when running behind a proxy like Nginx over a socket.</p>
+<h2>API</h2>
+<h3><code>bootify(options)</code></h3>
+<p>Initializes the application lifecycle. <code>bootify</code> validates option shapes early and throws <code>TypeError</code> for invalid input.</p>
+<h4>Options</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Property</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>app</code></td>
+<td style="text-align:left"><code>Function</code></td>
+<td style="text-align:left">A function called as <code>app(fastify, config)</code> that returns either a Fastify plugin or module with <code>default</code>; invalid returns throw a <code>TypeError</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>config</code></td>
+<td style="text-align:left"><code>Object</code></td>
+<td style="text-align:left">The configuration object (usually from <code>argv</code>).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>pkg</code></td>
+<td style="text-align:left"><code>Object</code></td>
+<td style="text-align:left">Optional parsed content of <code>package.json</code> (auto-loaded from <code>process.cwd()</code> when omitted).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>validator</code></td>
+<td style="text-align:left"><code>Function</code></td>
+<td style="text-align:left">Optional function to validate <code>config</code> before starting.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>hooks</code></td>
+<td style="text-align:left"><code>Object</code></td>
+<td style="text-align:left">Optional lifecycle hooks: <code>onBeforeListen</code>, <code>onAfterListen</code>, and <code>onShutdown</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4>Hook Contexts</h4>
+<ul>
+<li><code>onBeforeListen(context)</code>: Receives <code>{ fastify, config, pkg }</code>.</li>
+<li><code>onAfterListen(context)</code>: Receives <code>{ fastify, config, pkg, address }</code>.</li>
+<li><code>onShutdown(context)</code>: Receives <code>{ fastify, config, pkg, signal }</code>.</li>
+</ul>
+<h4>Return Value</h4>
+<p><code>bootify(options)</code> resolves to one of:</p>
+<ul>
+<li><code>void</code>: when clustering is disabled or executing in a worker process.</li>
+<li><code>BootifyManager</code>: when running as clustered master.</li>
+<li><code>BootifyManager.reload(): Promise&lt;void&gt;</code> for zero-downtime reload.</li>
+<li><code>BootifyManager.getMetrics()</code> for cluster worker/load metrics.</li>
+<li><code>BootifyManager.close(): Promise&lt;void&gt;</code> for programmatic cluster shutdown.</li>
+<li><code>BootifyManager.on/once/off(...)</code> for cluster lifecycle events.</li>
+</ul>
+<h4>Startup Semantics</h4>
+<p><code>bootify</code> uses a process-level startup state machine:</p>
+<ul>
+<li><code>idle</code>: no startup attempt is active.</li>
+<li><code>starting</code>: a startup attempt is in progress.</li>
+<li><code>started</code>: startup succeeded and the process is now locked to a single boot lifecycle.</li>
+</ul>
+<p>Behavior:</p>
+<ul>
+<li>A second call while <code>starting</code> throws <code>bootify() is already starting in this process.</code></li>
+<li>A call after successful startup (<code>started</code>) throws <code>bootify() can only be called once per process.</code></li>
+<li>If startup fails, state is reset back to <code>idle</code> and a later retry is allowed.</li>
+</ul>
+<h2>License</h2>
+<p>This project is licensed under the <a href="./LICENSE">MIT License</a>.</p></article>
+    </section>
+
+
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>plugin.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>A Fastify application bootstrapper and lifecycle manager with lots of @ynode helpers.</p>
+<p>This file is the entry point. It loads the configuration and initializes the
+cluster manager. The actual application logic runs in the worker process.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="plugin.js.html">plugin.js</a>, <a href="plugin.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>rewrite.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>rewrite.js: URL Rewrite Manager.</p>
+<p>Simple URL rewrite module.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="rewrite.js.html">rewrite.js</a>, <a href="rewrite.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>server.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>server.js: The Server Factory.</p>
+<p>Its single responsibility is to build and configure the Fastify server instance.
+It acts like a factory that assembles the server with all its plugins and routes
+and then hands off the finished product. It should not be responsible for running
+the server or binding it to a port. This makes your server definition reusable
+and much easier to test, as you can import createServer in a test file without
+causing side effects like listening on a port.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="server.js.html">server.js</a>, <a href="server.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>worker.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>worker.js: Compatibility re-exports for worker runtime modules.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>worker/lifecycle.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>worker/lifecycle.js: Worker signal/message lifecycle wiring.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker_lifecycle.js.html">worker/lifecycle.js</a>, <a href="worker_lifecycle.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>worker/listen.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>worker/listen.js: Listen parsing and startup retry utilities.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker_listen.js.html">worker/listen.js</a>, <a href="worker_listen.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>worker/start.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>worker/start.js: Worker startup orchestration.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker_start.js.html">worker/start.js</a>, <a href="worker_start.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#bootify">bootify</a></li><li><a href="global.html#createServer">createServer</a></li><li><a href="global.html#listen">listen</a></li><li><a href="global.html#off">off</a></li><li><a href="global.html#rewriteUrl">rewriteUrl</a></li><li><a href="global.html#start">start</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a>
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
