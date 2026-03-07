@@ -100,6 +100,9 @@ jobs:
                   echo "$line"
                   echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
 
+            - name: Install dependencies
+              run: npm ci
+
             - name: Generate Changelog
               run: npm run changelog
 
