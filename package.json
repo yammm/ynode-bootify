@@ -61,7 +61,7 @@
         "lint:fix": "eslint . --fix",
         "ver:preview": "npx autover --no-amend --dry-run --short",
         "ver:apply": "npx autover --guard-unchanged --short",
-        "test": "node --test",
+        "test": "node --test tests/",
         "prepublishOnly": "npm test && npm run lint",
         "postversion": "git push && git push --tags"
     },
