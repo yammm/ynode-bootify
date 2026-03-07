@@ -100,6 +100,9 @@ jobs:
                   echo "$line"
                   echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
 
+            - name: Generate Changelog
+              run: npm run changelog
+
             - name: Commit version changes
               id: commit_autover
               run: |
@@ -110,7 +113,7 @@ jobs:
                     exit 0
                   fi
                   git add -A
-                  git commit -m "chore: apply autover version metadata"
+                  git commit -m "chore: apply autover metadata and changelog"
                   echo "changed=true" >> "$GITHUB_OUTPUT"
 
             - name: Push autover commit back
