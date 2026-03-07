@@ -36,12 +36,12 @@ import globals from "globals";
 
 export default defineConfig([
     {
-        ignores: ["**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
         linterOptions: { reportUnusedDisableDirectives: true },
     },
     {
         files: ["**/js/*.js"],
-        ignores: ["**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
         plugins: { js, prettier: pluginPrettier, "simple-import-sort": simpleImportSort },
         extends: ["js/recommended"],
         languageOptions: {
@@ -74,7 +74,14 @@ export default defineConfig([
     },
     {
         files: ["**/*.{js,mjs,cjs}"],
-        ignores: ["**/js/*.js", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: [
+            "CHANGELOG.md",
+            "**/js/*.js",
+            "**/node_modules/**",
+            "**/*.min.js",
+            "**/package-lock.json",
+            "**/docs/**",
+        ],
         plugins: { js, prettier: pluginPrettier, "simple-import-sort": simpleImportSort },
         extends: ["js/recommended"],
         languageOptions: {
@@ -107,14 +114,14 @@ export default defineConfig([
     },
     {
         files: ["**/*.json"],
-        ignores: ["**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
         plugins: { json },
         language: "json/json",
         extends: ["json/recommended"],
     },
     {
         files: ["**/*.md"],
-        ignores: ["**/node_modules/**", "**/docs/**"],
+        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/docs/**"],
         plugins: { markdown },
         language: "markdown/gfm",
         extends: ["markdown/recommended"],
@@ -124,7 +131,7 @@ export default defineConfig([
     {
         // eslint-config-prettier turns off `curly`, but we want to strictly enforce it
         files: ["**/*.{js,mjs,cjs}"],
-        ignores: ["**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        ignores: ["CHANGELOG.md", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
         rules: {
             curly: ["error", "all"],
             "brace-style": ["error", "1tbs", { allowSingleLine: false }],
