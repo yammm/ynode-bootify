@@ -2,3 +2,15 @@
 node_modules/
 *.log
 .DS_Store
+example/
+scripts/
+test/
+tests/
+docs/
+.editorconfig
+.prettierrc*
+.prettierignore
+eslint.config.js
+Makefile
+jsdoc.json
+.nvmrc
