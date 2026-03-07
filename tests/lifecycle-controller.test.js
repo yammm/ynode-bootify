@@ -12,8 +12,8 @@ function createFastifyDouble() {
             this.closeCalls += 1;
         },
         log: {
-            error() {},
-            warn() {},
+            error() { },
+            warn() { },
         },
     };
 }
@@ -51,6 +51,7 @@ test("createLifecycleController handles repeated signals idempotently", async ()
 test("createLifecycleController applies worker cluster updates and shutdown command", async () => {
     const signalTarget = new EventEmitter();
     const worker = new EventEmitter();
+    worker.disconnect = () => { };
     const fastify = createFastifyDouble();
     const shutdownSignals = [];
 
