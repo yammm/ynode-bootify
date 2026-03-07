@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #
-# Copyright (c) 2025 Michael Welter <me@mikinho.com>
+# Copyright (c) 2026 Michael Welter <me@mikinho.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,17 +22,30 @@
 # SOFTWARE.
 #
 
-GIT_DIR="$(git rev-parse --git-dir)"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+set -euo pipefail
 
-if [[ -z "${GIT_DIR}" ]]
-then
-    echo "ERROR: Folder '$(pwd)' not part of a working git tree"
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || true)
+
+if [[ -z "${GIT_DIR}" ]]; then
+    echo "ERROR: Folder '$(pwd)' is not part of a working git tree." >&2
     exit 1
-fi;
+fi
 
-for file in "${SCRIPT_DIR}"/hooks/*
-do
-    [[ -e "${file}" ]] || continue
-    ln -fv "${file}" "${GIT_DIR}/hooks"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOKS_DIR="${SCRIPT_DIR}/hooks"
+
+if [[ ! -d "${HOOKS_DIR}" ]]; then
+    echo "ERROR: Hooks directory '${HOOKS_DIR}' does not exist." >&2
+    exit 1
+fi
+
+echo "Installing git hooks from ${HOOKS_DIR} into ${GIT_DIR}/hooks..."
+
+for file in "${HOOKS_DIR}"/*; do
+    if [[ -f "${file}" ]]; then
+        hook_name=$(basename "${file}")
+        ln -sfv "../../scripts/hooks/${hook_name}" "${GIT_DIR}/hooks/${hook_name}"
+    fi
 done
+
+echo "✅ Git hooks installed successfully!"

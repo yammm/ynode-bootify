@@ -3,6 +3,14 @@
 Welcome! We appreciate your help in improving this plugin.
 
 ## Development
+### Getting Started
+
+Before contributing, please securely install the local Git hooks which enforce commit message formatting and other standards:
+
+```bash
+./scripts/setup-hooks
+```
+
 ### Development Commands
 
 ```bash
