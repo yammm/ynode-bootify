@@ -27,25 +27,12 @@ set -euo pipefail
 GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || true)
 
 if [[ -z "${GIT_DIR}" ]]; then
-    echo "ERROR: Folder '$(pwd)' is not part of a working git tree." >&2
+    echo "ERROR: Folder '${PWD}' is not part of a working git tree." >&2
     exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOKS_DIR="${SCRIPT_DIR}/hooks"
+# Use Git's native modern configuration to proxy hooks directly to the scripts folder!
+# Hooks evaluate relative paths relative to the root of the working tree.
+git config core.hooksPath "scripts/hooks"
 
-if [[ ! -d "${HOOKS_DIR}" ]]; then
-    echo "ERROR: Hooks directory '${HOOKS_DIR}' does not exist." >&2
-    exit 1
-fi
-
-echo "Installing git hooks from ${HOOKS_DIR} into ${GIT_DIR}/hooks..."
-
-for file in "${HOOKS_DIR}"/*; do
-    if [[ -f "${file}" ]]; then
-        hook_name=$(basename "${file}")
-        ln -sfv "../../scripts/hooks/${hook_name}" "${GIT_DIR}/hooks/${hook_name}"
-    fi
-done
-
-echo "✅ Git hooks installed successfully!"
+echo "✅ Git hooks configured successfully to securely proxy to 'scripts/hooks'."
