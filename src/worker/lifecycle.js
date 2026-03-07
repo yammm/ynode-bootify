@@ -95,8 +95,10 @@ export function createLifecycleController({
             if (msg === "shutdown") {
                 try {
                     await gracefulShutdown("shutdown");
+                    worker.disconnect();
                 } catch (ex) {
                     fastify.log.error(ex, "Error during shutdown command handling");
+                    process.exit(1);
                 }
             }
         };
