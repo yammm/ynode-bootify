@@ -30,7 +30,7 @@ jobs:
               id: autover
               run: |
                   set -euo pipefail
-                  line="$(npx --yes autover --workspaces --guard-unchanged --no-amend --dry-run --short)"
+                  line="$(npx --yes @mikinho/autover --workspaces --guard-unchanged --no-amend --dry-run --short)"
                   echo "$line"
                   echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
             - name: Comment on PR with version summary
@@ -96,7 +96,7 @@ jobs:
               id: apply_autover
               run: |
                   set -euo pipefail
-                  line="$(npx --yes autover --workspaces --guard-unchanged --no-amend --short)"
+                  line="$(npx --yes @mikinho/autover --workspaces --guard-unchanged --no-amend --short)"
                   echo "$line"
                   echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
 
