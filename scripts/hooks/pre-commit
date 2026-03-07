@@ -16,7 +16,7 @@ FILES=$(git diff --cached --name-only --diff-filter=ACMRTUXB | tr '\n' ' ')
 
 if [ -n "$FILES" ]; then
     echo "[pre-commit] Running Prettier..."
-    npx prettier --check $FILES
+    npx prettier --check --ignore-unknown $FILES
 
     echo "[pre-commit] Running ESLint..."
     npx eslint --no-warn-ignored $FILES

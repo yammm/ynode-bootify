@@ -10,7 +10,7 @@ for /f "delims=" %%i in ('git diff --cached --name-only --diff-filter=ACMRTUXB')
 
 if defined FILES (
     echo [pre-commit] Running Prettier...
-    call npx prettier --check !FILES!
+    call npx prettier --check --ignore-unknown !FILES!
     if !errorlevel! neq 0 exit /b 1
 
     echo [pre-commit] Running ESLint...
