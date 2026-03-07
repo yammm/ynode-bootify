@@ -1,0 +1,28 @@
+name: security-audit
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    schedule:
+        - cron: "0 9 * * 1"
+    workflow_dispatch:
+
+jobs:
+    audit:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "24"
+                  cache: npm
+
+            - name: Install deps
+              run: npm ci
+
+            - name: Run npm audit (high+)
+              run: npm audit --audit-level=high

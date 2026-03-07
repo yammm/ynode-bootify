@@ -1,0 +1,151 @@
+name: autover
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, labeled, unlabeled]
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: write
+
+env:
+    REQUIRED_LABEL: autover-apply
+    CREATE_TAG: "false"
+
+jobs:
+    preview:
+        if: ${{ github.event_name == 'pull_request' }}
+        runs-on: ubuntu-latest
+        env:
+            CI: "true"
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+            - name: Run autover (dry-run)
+              id: autover
+              run: |
+                  set -euo pipefail
+                  line="$(npx --yes autover --workspaces --guard-unchanged --no-amend --dry-run --short)"
+                  echo "$line"
+                  echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
+            - name: Comment on PR with version summary
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const summary = `${{ toJSON(steps.autover.outputs.summary) }}`.replace(/^"|"$/g, "");
+                      const body = summary && summary.trim().length
+                        ? `🧭 **autover** preview\n\n\`${summary}\``
+                        : "🧭 **autover** preview\n\n_No changes or summary unavailable._";
+                      await github.rest.issues.createComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: context.issue.number,
+                        body
+                      });
+
+    apply:
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]' }}
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+            - name: Identify PR associated with this push
+              id: pr
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const sha = context.sha;
+                      const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        commit_sha: sha,
+                      });
+                      if (!prs || prs.length === 0) {
+                        core.setOutput('found', 'false');
+                        return;
+                      }
+                      const pr = prs[0];
+                      const labels = pr.labels?.map(l => (typeof l === 'string' ? l : l.name)) || [];
+                      const required = process.env.REQUIRED_LABEL;
+                      const hasRequired = labels.includes(required);
+                      core.setOutput('found', 'true');
+                      core.setOutput('number', pr.number.toString());
+                      core.setOutput('has_required', hasRequired ? 'true' : 'false');
+
+            - name: Exit if no PR or missing required label
+              if: ${{ steps.pr.outputs.found != 'true' || steps.pr.outputs.has_required != 'true' }}
+              run: |
+                  echo "Guarded apply skipped."
+                  exit 0
+
+            - name: Configure Git author
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            - name: Run autover (apply)
+              id: apply_autover
+              run: |
+                  set -euo pipefail
+                  line="$(npx --yes autover --workspaces --guard-unchanged --no-amend --short)"
+                  echo "$line"
+                  echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
+
+            - name: Commit version changes
+              id: commit_autover
+              run: |
+                  set -euo pipefail
+                  if [ -z "$(git status --porcelain)" ]; then
+                    echo "changed=false" >> "$GITHUB_OUTPUT"
+                    echo "No autover file changes to commit."
+                    exit 0
+                  fi
+                  git add -A
+                  git commit -m "chore: apply autover version metadata"
+                  echo "changed=true" >> "$GITHUB_OUTPUT"
+
+            - name: Push autover commit back
+              if: ${{ steps.commit_autover.outputs.changed == 'true' }}
+              run: git push
+
+            - name: Optionally create tag from autover output
+              if: ${{ env.CREATE_TAG == 'true' && steps.commit_autover.outputs.changed == 'true' }}
+              run: |
+                  set -euo pipefail
+                  line="${{ steps.apply_autover.outputs.summary }}"
+                  ver="$(echo "$line" | awk -F'|' '{gsub(/^ *| *$/,"",$2); print $2}')"
+                  if [ -n "$ver" ] && [ "$ver" != "unchanged" ]; then
+                    tag="v$(echo "$ver" | sed 's/[+-].*$//')"
+                    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+                      echo "Tag $tag already exists; skipping."
+                    else
+                      git tag "$tag"
+                      git push origin "$tag"
+                    fi
+                  fi
+
+            - name: Comment result on the source PR
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const prNumber = Number(`${{ steps.pr.outputs.number || 0 }}`);
+                      if (!prNumber) return;
+                      const summary = `${{ toJSON(steps.apply_autover.outputs.summary) }}`.replace(/^"|"$/g, "");
+                      const body = summary && summary.trim().length
+                        ? `✅ **autover** applied on \`main\`\n\n\`${summary}\``
+                        : "ℹ️ **autover** ran on `main` but produced no changes.";
+                      await github.rest.issues.createComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: prNumber,
+                        body
+                      });
