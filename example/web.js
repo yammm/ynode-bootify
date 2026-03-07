@@ -12,7 +12,7 @@
  */
 
 import pkg from "../package.json" with { type: "json" };
-import { bootify } from "../src/index.js";
+import { bootify } from "../src/plugin.js";
 import argv from "./config.js";
 
 try {

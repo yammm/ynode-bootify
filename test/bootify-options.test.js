@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { bootify } from "../src/index.js";
+import { bootify } from "../src/plugin.js";
 
 async function expectTypeError(fn, pattern) {
     await assert.rejects(fn, (err) => {

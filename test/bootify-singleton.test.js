@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { test } from "node:test";
 
-import { bootify } from "../src/index.js";
+import { bootify } from "../src/plugin.js";
 import { createLogStub } from "../test-utils/log-stub.js";
 
 function createBootifyState(state = "idle") {
@@ -21,7 +21,7 @@ test("bootify rejects repeated valid invocations", async () => {
     const bootifyState = createBootifyState();
 
     const options = {
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: false },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -46,7 +46,7 @@ test("bootify creates pidfile when pidfile config is set", async () => {
     const pidfileCalls = [];
 
     await bootify({
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: false, pidfile: "/tmp/ynode-bootify.pid" },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -69,7 +69,7 @@ test("bootify allows retry after failed startup", async () => {
     let runCalls = 0;
 
     const options = {
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: false },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -104,7 +104,7 @@ test("bootify rejects concurrent call while startup is in progress", async () =>
     });
 
     const options = {
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: false },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -128,7 +128,7 @@ test("bootify registers SIGQUIT/exit and wires SIGHUP reload handler", async () 
     let reloadCalls = 0;
 
     await bootify({
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: true },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -156,7 +156,7 @@ test("bootify skips SIGHUP wiring when manager has no reload method", async () =
     const bootifyState = createBootifyState();
 
     await bootify({
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: true },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -178,7 +178,7 @@ test("bootify defaults cluster config to enabled when config.cluster is omitted"
     let capturedRunOptions = null;
 
     await bootify({
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: {},
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -200,7 +200,7 @@ test("bootify skips SIGHUP wiring when manager reload is not a function", async 
     const bootifyState = createBootifyState();
 
     await bootify({
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: true },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
@@ -234,7 +234,7 @@ test("bootify catches and logs SIGHUP-triggered reload failures", async () => {
 
     try {
         await bootify({
-            app: async () => async () => {},
+            app: async () => async () => { },
             config: { cluster: true },
             pkg: { name: "test", version: "1.0.0" },
             _internal: {
@@ -277,7 +277,7 @@ test("bootify uses processTarget.abort for SIGQUIT", async () => {
 
     try {
         await bootify({
-            app: async () => async () => {},
+            app: async () => async () => { },
             config: { cluster: false },
             pkg: { name: "test", version: "1.0.0" },
             _internal: {
@@ -313,7 +313,7 @@ test("bootify passes cluster.tty options through to cluster run()", async () => 
     };
 
     await bootify({
-        app: async () => async () => {},
+        app: async () => async () => { },
         config: { cluster: clusterOptions },
         pkg: { name: "test", version: "1.0.0" },
         _internal: {
