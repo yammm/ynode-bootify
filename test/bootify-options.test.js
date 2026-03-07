@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
 import { bootify } from "../src/index.js";
 
 async function expectTypeError(fn, pattern) {

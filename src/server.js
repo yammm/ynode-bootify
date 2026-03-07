@@ -11,10 +11,10 @@
 
 import cluster from "node:cluster";
 
-import Fastify from "fastify";
-
 import autoshutdown from "@ynode/autoshutdown";
+import Fastify from "fastify";
 import proxiable from "proxiable";
+
 import { rewriteUrl } from "./rewrite.js";
 
 /**

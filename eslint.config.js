@@ -23,13 +23,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-import { defineConfig } from "eslint/config";
-import globals from "globals";
+import { builtinModules } from "node:module";
+
 import js from "@eslint/js";
 import json from "@eslint/json";
 import markdown from "@eslint/markdown";
-// import eslintConfigPrettier from "eslint-config-prettier";
+import { defineConfig } from "eslint/config";
+import eslintConfigPrettier from "eslint-config-prettier";
 import pluginPrettier from "eslint-plugin-prettier";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
+import globals from "globals";
 
 export default defineConfig([
     {
@@ -37,9 +40,42 @@ export default defineConfig([
         linterOptions: { reportUnusedDisableDirectives: true },
     },
     {
-        files: ["**/*.{js,mjs,cjs}"],
+        files: ["**/js/*.js"],
         ignores: ["**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
-        plugins: { js, prettier: pluginPrettier },
+        plugins: { js, prettier: pluginPrettier, "simple-import-sort": simpleImportSort },
+        extends: ["js/recommended"],
+        languageOptions: {
+            globals: { ...globals.browser, ...globals.es2024 },
+        },
+        rules: {
+            "no-var": "error",
+            "prefer-const": ["error", { destructuring: "all" }],
+            "no-unused-vars": ["error", { args: "none", ignoreRestSiblings: true }],
+            "no-implicit-coercion": ["warn", { allow: ["!!"] }],
+            indent: ["error", 4, { SwitchCase: 1 }],
+            semi: ["error", "always"],
+            curly: ["error", "all"],
+            "brace-style": ["error", "1tbs", { allowSingleLine: false }],
+            quotes: ["error", "double", { avoidEscape: true, allowTemplateLiterals: true }],
+            "simple-import-sort/imports": [
+                "error",
+                {
+                    groups: [
+                        ["^\\u0000"],
+                        [`^node:`, `^(${builtinModules.join("|")})(/|$)`],
+                        ["^@?\\w"],
+                        ["^.*core(/|$)"],
+                        ["^\\."],
+                    ],
+                },
+            ],
+            "simple-import-sort/exports": "error",
+        },
+    },
+    {
+        files: ["**/*.{js,mjs,cjs}"],
+        ignores: ["**/js/*.js", "**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        plugins: { js, prettier: pluginPrettier, "simple-import-sort": simpleImportSort },
         extends: ["js/recommended"],
         languageOptions: {
             globals: { ...globals.node, ...globals.es2024 },
@@ -49,13 +85,24 @@ export default defineConfig([
             "prefer-const": ["error", { destructuring: "all" }],
             "no-unused-vars": ["error", { args: "none", ignoreRestSiblings: true }],
             "no-implicit-coercion": ["warn", { allow: ["!!"] }],
-            "no-console": "off",
-            // "array-bracket-spacing": ["error", "always"], // conflicts with prettier
-            // indent: ["error", 4, { SwitchCase: 1 }], // conflicts with prettier
+            indent: ["error", 4, { SwitchCase: 1 }],
             semi: ["error", "always"],
             curly: ["error", "all"],
             "brace-style": ["error", "1tbs", { allowSingleLine: false }],
             quotes: ["error", "double", { avoidEscape: true, allowTemplateLiterals: true }],
+            "simple-import-sort/imports": [
+                "error",
+                {
+                    groups: [
+                        ["^\\u0000"],
+                        [`^node:`, `^(${builtinModules.join("|")})(/|$)`],
+                        ["^@?\\w"],
+                        ["^.*core(/|$)"],
+                        ["^\\."],
+                    ],
+                },
+            ],
+            "simple-import-sort/exports": "error",
         },
     },
     {
@@ -72,6 +119,16 @@ export default defineConfig([
         language: "markdown/gfm",
         extends: ["markdown/recommended"],
     },
-    // Optionally put this LAST to disable any rules that would fight Prettier
-    // eslintConfigPrettier,
+    // Put this LAST to disable rules that conflict with Prettier formatting
+    eslintConfigPrettier,
+    {
+        // eslint-config-prettier turns off `curly`, but we want to strictly enforce it
+        files: ["**/*.{js,mjs,cjs}"],
+        ignores: ["**/node_modules/**", "**/*.min.js", "**/package-lock.json", "**/docs/**"],
+        rules: {
+            curly: ["error", "all"],
+            "brace-style": ["error", "1tbs", { allowSingleLine: false }],
+            quotes: ["error", "double", { avoidEscape: true, allowTemplateLiterals: true }],
+        },
+    },
 ]);

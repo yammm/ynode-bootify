@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import cluster from "node:cluster";
 import { test } from "node:test";
+
 import { createServer } from "../src/server.js";
 import { createLogStub } from "../test-utils/log-stub.js";
 

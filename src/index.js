@@ -28,19 +28,18 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-import { pathToFileURL } from "node:url";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 // server factory function
 import { run } from "@ynode/cluster";
-import { start } from "./worker.js";
-import { off } from "./events.js";
-
 // configs
 // import pkg from "${process.cwd()}/package.json" with { type: "json" };
-
 // logging
 import ylog from "@ynode/ylog";
+
+import { off } from "./events.js";
+import { start } from "./worker.js";
 
 const BOOTIFY_ONCE_ERROR = "bootify() can only be called once per process.";
 const BOOTIFY_STARTING_ERROR = "bootify() is already starting in this process.";
@@ -165,9 +164,7 @@ export async function bootify({ app, config, pkg, validator, hooks, _internal = 
         const manager = await runFn(
             async () => start({ app, config, log, pkg, hooks }),
             {
-                ...(typeof config.cluster === "object"
-                    ? config.cluster
-                    : { enabled: config.cluster }),
+                ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }),
             },
             log,
         );

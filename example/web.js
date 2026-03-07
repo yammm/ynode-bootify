@@ -11,9 +11,9 @@
  * Demonstrates how to use @ynode/bootify with a robust configuration.
  */
 
+import pkg from "../package.json" with { type: "json" };
 import { bootify } from "../src/index.js";
 import argv from "./config.js";
-import pkg from "../package.json" with { type: "json" };
 
 try {
     await bootify({
