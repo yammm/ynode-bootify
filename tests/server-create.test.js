@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import cluster from "node:cluster";
 import { test } from "node:test";
 
-import { createServer } from "../src/server.js";
+import { buildAutoshutdownOptions, createServer } from "../src/server.js";
 import { createLogStub } from "../test-utils/log-stub.js";
 
 async function withWorkerFlag(workerFlag, fn) {
@@ -74,6 +74,13 @@ test("createServer registers autoshutdown only for worker processes", async () =
         await fastify.ready();
         assert.strictEqual(fastify.hasDecorator("autoshutdown"), true);
         await fastify.close();
+    });
+});
+
+test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
+    assert.deepStrictEqual(buildAutoshutdownOptions({}), {});
+    assert.deepStrictEqual(buildAutoshutdownOptions({ sleep: 45, reportLoad: true }), {
+        sleep: 45,
     });
 });
 

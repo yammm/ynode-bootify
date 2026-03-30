@@ -18,6 +18,23 @@ import proxiable from "proxiable";
 import { rewriteUrl } from "./rewrite.js";
 
 /**
+ * Builds the autoshutdown options used for worker processes.
+ * Cluster workers already report load directly to the master, so bootify only
+ * forwards idle-shutdown configuration here.
+ * @param {object} [config={}] - The configuration object from yargs.
+ * @returns {object} Normalized autoshutdown options.
+ */
+export function buildAutoshutdownOptions(config = {}) {
+    const autoShutdownOptions = {};
+
+    if (config.sleep !== undefined) {
+        autoShutdownOptions.sleep = config.sleep;
+    }
+
+    return autoShutdownOptions;
+}
+
+/**
  * Creates and configures a Fastify server instance.
  * @param {object} config - The configuration object from yargs.
  * @param {object} log - The logger instance.
@@ -34,11 +51,7 @@ export async function createServer(config, log) {
 
     // register plugins
     if (cluster.isWorker) {
-        const autoShutdownOptions = { reportLoad: true };
-        if (config.sleep !== undefined) {
-            autoShutdownOptions.sleep = config.sleep;
-        }
-        fastify.register(autoshutdown, autoShutdownOptions);
+        fastify.register(autoshutdown, buildAutoshutdownOptions(config));
     }
 
     // use proxiable to handle common issues with unix domain sockets
