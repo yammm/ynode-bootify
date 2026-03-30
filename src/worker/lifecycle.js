@@ -6,6 +6,11 @@ import cluster from "node:cluster";
 
 import { off } from "../events.js";
 
+/**
+ * Formats the server's bound address for display in log messages.
+ * @param {object} server - Node.js HTTP/HTTPS server.
+ * @returns {string} Formatted address string (e.g. "127.0.0.1:3000" or "[::1]:3000").
+ */
 export function resolveListenAddress(server) {
     const address = server.address();
     if (typeof address === "string") {
@@ -20,6 +25,18 @@ export function resolveListenAddress(server) {
     return `${address.address}:${address.port}`;
 }
 
+/**
+ * Wires up signal handlers, worker message handling, and graceful shutdown
+ * orchestration for a worker process.
+ * @param {object} options
+ * @param {object} options.fastify - Fastify instance.
+ * @param {object} options.config - Application configuration.
+ * @param {object} options.pkg - Package.json content.
+ * @param {object} [options.hooks] - Lifecycle hooks (onShutdown).
+ * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
+ * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
+ * @returns {{ lifecycleContext: object, gracefulShutdown: Function, dispose: Function }}
+ */
 export function createLifecycleController({
     fastify,
     config,
@@ -67,7 +84,7 @@ export function createLifecycleController({
     };
 
     const signalHandlers = new Map();
-    ["SIGINT", "SIGTERM", "SIGUSR2"].forEach((signal) => {
+    for (const signal of ["SIGINT", "SIGTERM", "SIGUSR2"]) {
         const handler = async () => {
             try {
                 await gracefulShutdown(signal);
@@ -77,7 +94,7 @@ export function createLifecycleController({
         };
         signalHandlers.set(signal, handler);
         signalTarget.on(signal, handler);
-    });
+    }
 
     let workerMessageHandler = null;
     if (worker) {
@@ -108,7 +125,9 @@ export function createLifecycleController({
     }
 
     const dispose = () => {
-        signalHandlers.forEach((handler, signal) => off(signalTarget, signal, handler));
+        for (const [signal, handler] of signalHandlers) {
+            off(signalTarget, signal, handler);
+        }
         if (worker && workerMessageHandler) {
             off(worker, "message", workerMessageHandler);
         }

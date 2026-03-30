@@ -2,6 +2,11 @@
  * @fileoverview worker/listen.js: Listen parsing and startup retry utilities.
  */
 
+/**
+ * Parses and validates a port number.
+ * @param {string|number} port - Raw port value.
+ * @returns {number} Validated port in the range 0-65535.
+ */
 function parsePort(port) {
     const portNumber = Number(port);
     if (!Number.isInteger(portNumber) || portNumber < 0 || portNumber > 65535) {
@@ -10,6 +15,11 @@ function parsePort(port) {
     return portNumber;
 }
 
+/**
+ * Determines whether a string represents a Unix socket or Windows named pipe path.
+ * @param {string} value - Listen address string.
+ * @returns {boolean}
+ */
 function isSocketPath(value) {
     return (
         value.startsWith("/") ||
@@ -24,6 +34,11 @@ function isSocketPath(value) {
     );
 }
 
+/**
+ * Validates and normalizes an object-form listen configuration.
+ * @param {object} listen - Listen config with path or host/port properties.
+ * @returns {object} Normalized listen config for Fastify.
+ */
 function parseListenObject(listen) {
     const hasPath = listen.path !== undefined && listen.path !== null;
     const hasPort = listen.port !== undefined && listen.port !== null;
@@ -62,14 +77,14 @@ function parseListenObject(listen) {
         listenConfig.backlog = listen.backlog;
     }
 
-    ["readableAll", "writableAll", "ipv6Only", "exclusive"].forEach((key) => {
+    for (const key of ["readableAll", "writableAll", "ipv6Only", "exclusive"]) {
         if (listen[key] !== undefined) {
             if (typeof listen[key] !== "boolean") {
                 throw new TypeError(`Invalid "listen.${key}" option. Expected a boolean.`);
             }
             listenConfig[key] = listen[key];
         }
-    });
+    }
 
     return listenConfig;
 }
@@ -140,6 +155,15 @@ export function resolveListenRetry(config = {}) {
     return { retries, delay };
 }
 
+/**
+ * Retries an async operation with fixed delay between attempts.
+ * @param {Function} operation - Async function to attempt.
+ * @param {object} [options] - Retry options.
+ * @param {number} [options.retries=5] - Maximum number of attempts.
+ * @param {number} [options.delay=100] - Delay in milliseconds between retries.
+ * @param {Function} [options.onRetry] - Callback invoked on each retry with (error, attempt, delay).
+ * @returns {Promise<*>} Result of the successful operation.
+ */
 async function retryOperation(operation, { retries = 5, delay = 100, onRetry } = {}) {
     for (let attempt = 1; attempt <= retries; ++attempt) {
         try {
@@ -180,7 +204,7 @@ export async function listen(fastify, retries = 5, delay = 100) {
             },
         });
     } catch (ex) {
-        fastify.log.error("All attempts failed. No cake today.");
+        fastify.log.error("All startup listen attempts exhausted.");
         throw ex;
     }
 }

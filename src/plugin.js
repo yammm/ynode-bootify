@@ -45,30 +45,49 @@ const BOOTIFY_ONCE_ERROR = "bootify() can only be called once per process.";
 const BOOTIFY_STARTING_ERROR = "bootify() is already starting in this process.";
 let bootifyState = "idle";
 
+/**
+ * Checks whether a value is a plain object (not null, not an array).
+ * @param {*} value - Value to check.
+ * @returns {boolean}
+ */
 function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+/**
+ * Throws TypeError if the value is not a function.
+ * @param {*} value - Value to validate.
+ * @param {string} name - Option name for the error message.
+ */
 function assertFunction(value, name) {
     if (typeof value !== "function") {
         throw new TypeError(`Invalid "${name}" option. Expected a function.`);
     }
 }
 
+/**
+ * Throws TypeError if the value is not a plain object.
+ * @param {*} value - Value to validate.
+ * @param {string} name - Option name for the error message.
+ */
 function assertObject(value, name) {
     if (!isObject(value)) {
         throw new TypeError(`Invalid "${name}" option. Expected an object.`);
     }
 }
 
+/**
+ * Validates the hooks option shape, ensuring each hook is a function if present.
+ * @param {object} hooks - Lifecycle hooks object to validate.
+ */
 function validateHooks(hooks) {
     assertObject(hooks, "hooks");
 
-    ["onBeforeListen", "onAfterListen", "onShutdown"].forEach((name) => {
+    for (const name of ["onBeforeListen", "onAfterListen", "onShutdown"]) {
         if (hooks[name] !== undefined && typeof hooks[name] !== "function") {
             throw new TypeError(`Invalid "hooks.${name}" option. Expected a function.`);
         }
-    });
+    }
 }
 
 /**
@@ -179,8 +198,13 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
         // trigger zero-downtime reload
         if (manager && typeof manager.reload === "function") {
             sighupHandler = () => {
-                Promise.resolve(manager.reload()).catch((ex) => {
-                    log.error(ex, "SIGHUP-triggered reload failed.");
+                // Intentional fire-and-forget — reload runs in the background.
+                void Promise.resolve(manager.reload()).catch((ex) => {
+                    try {
+                        log.error(ex, "SIGHUP-triggered reload failed.");
+                    } catch {
+                        // Guard against log.error throwing — avoid unhandled rejection.
+                    }
                 });
             };
             processTarget.on("SIGHUP", sighupHandler);

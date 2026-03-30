@@ -36,20 +36,20 @@
         "node": ">=20"
     },
     "devDependencies": {
-        "@eslint/js": "^9.37.0",
-        "@eslint/json": "^0.13.2",
-        "@eslint/markdown": "^7.4.0",
-        "@mikinho/autover": "^2.0.1",
+        "@eslint/js": "^10.0.1",
+        "@eslint/json": "^1.2.0",
+        "@eslint/markdown": "^8.0.1",
+        "@mikinho/autover": "^2.1.0",
         "auto-changelog": "^2.5.0",
-        "eslint": "^9.37.0",
+        "eslint": "^10.1.0",
         "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-prettier": "^5.5.4",
+        "eslint-plugin-prettier": "^5.5.5",
         "eslint-plugin-simple-import-sort": "^12.1.1",
-        "fastify": "^5.7.1",
-        "globals": "^16.4.0",
+        "fastify": "^5.8.4",
+        "globals": "^17.4.0",
         "jsdoc": "^4.0.5",
-        "prettier": "^3.6.2",
-        "rimraf": "^6.0.1",
+        "prettier": "^3.8.1",
+        "rimraf": "^6.1.3",
         "yargs": "^18.0.0"
     },
     "scripts": {
@@ -77,11 +77,11 @@
         "LICENSE"
     ],
     "dependencies": {
-        "@ynode/autoshutdown": "^1.2.1",
-        "@ynode/cluster": "^1.4.0",
-        "@ynode/ylog": "^1.0.2",
+        "@ynode/autoshutdown": "^1.6.0",
+        "@ynode/cluster": "^1.7.0",
+        "@ynode/ylog": "^1.3.0",
         "mkpidfile": "^1.0.1",
-        "proxiable": "^1.0.1"
+        "proxiable": "^1.0.4"
     },
     "peerDependencies": {
         "fastify": "5.x"
