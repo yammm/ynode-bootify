@@ -24,12 +24,17 @@
     "homepage": "https://github.com/yammm/ynode-bootify#readme",
     "keywords": [
         "fastify",
+        "fastify-plugin",
         "bootstrap",
         "framework",
         "cluster",
         "process-manager",
         "graceful-shutdown",
         "zero-downtime",
+        "lifecycle",
+        "startup",
+        "signal-handling",
+        "pidfile",
         "ynode"
     ],
     "engines": {
