@@ -99,14 +99,31 @@ export function createLifecycleController({
     let workerMessageHandler = null;
     if (worker) {
         workerMessageHandler = async (msg) => {
-            if (msg && typeof msg === "object" && msg.cmd === "cluster-count") {
-                if (Number.isInteger(msg.count) && msg.count > 0) {
-                    fastify.clusterCount = msg.count;
-                } else {
-                    fastify.log.warn(
-                        { count: msg.count },
-                        "Ignoring invalid cluster-count message payload.",
-                    );
+            if (msg && typeof msg === "object") {
+                if (msg.cmd === "cluster-count") {
+                    if (Number.isInteger(msg.count) && msg.count > 0) {
+                        fastify.clusterCount = msg.count;
+                    } else {
+                        fastify.log.warn(
+                            { count: msg.count },
+                            "Ignoring invalid cluster-count message payload.",
+                        );
+                    }
+                    return;
+                }
+
+                if (msg.cmd === "ping") {
+                    worker.send({ cmd: "ping", ts: Date.now() });
+                    return;
+                }
+
+                if (msg.cmd === "version") {
+                    worker.send({
+                        cmd: "version",
+                        appVersion: pkg?.version ?? null,
+                        nodeVersion: process.version,
+                    });
+                    return;
                 }
             }
 
