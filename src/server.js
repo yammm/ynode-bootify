@@ -45,6 +45,7 @@ export async function createServer(config, log) {
         loggerInstance: log,
         trustProxy: config.trustProxy ?? false,
         http2: !!config.http2,
+        forceCloseConnections: config.http2 ? false : "idle",
         disableRequestLogging: true,
         rewriteUrl: (req) => rewriteUrl(req, config),
     });
