@@ -76,7 +76,7 @@ cluster: {
   tty: {
     enabled: true,
     commands: true,
-    reloadCommand: "rl"
+    reloadCommand: "/rl"
   }
 }
 ```

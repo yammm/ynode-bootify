@@ -307,7 +307,7 @@ test("bootify passes cluster.tty options through to cluster run()", async () => 
         tty: {
             enabled: true,
             commands: true,
-            reloadCommand: "rl",
+            reloadCommand: "/rl",
             prompt: "cluster> ",
         },
     };
