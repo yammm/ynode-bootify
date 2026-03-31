@@ -83,7 +83,7 @@
     ],
     "dependencies": {
         "@ynode/autoshutdown": "^1.6.3",
-        "@ynode/cluster": "^1.7.3",
+        "@ynode/cluster": "^1.8.0",
         "@ynode/ylog": "^1.3.3",
         "mkpidfile": "^1.0.1",
         "proxiable": "^1.0.4"
