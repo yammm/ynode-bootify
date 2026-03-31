@@ -68,7 +68,9 @@ The `config` object is typically the resolved output of `yargs`. It supports the
 - `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to `{ retries: 5, delay: 15000 }`.
 
-With `@ynode/cluster` `1.4.0+`, you can configure TTY command mode and reload commands via `cluster.tty`, for example:
+With `@ynode/cluster` `1.4.0+`, you can configure TTY command mode and reload commands via `cluster.tty`. Starting with `@ynode/cluster` `1.8.0+`, `@ynode/bootify` automatically intercepts and responds to the built-in telemetry queries (`/status`, `/ping`, `/version`) without any additional boilerplate.
+
+For example:
 
 ```js
 cluster: {
