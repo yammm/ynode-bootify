@@ -51,6 +51,32 @@ export function createLifecycleController({
     const gracefulShutdown = async (signal) => {
         if (!shutdownPromise) {
             shutdownPromise = (async () => {
+                // Drop out of the cluster master's round-robin pool and
+                // evict every existing client connection before Fastify
+                // flips into closing-state. fastify.close() does these
+                // eventually, but only after preClose hooks (Mongoose,
+                // Redis, etc.) finish — and during that window the router
+                // rejects every keep-alive request with 503. Doing it up
+                // front means clients reconnect cleanly to a healthy
+                // worker instead.
+                if (fastify.server?.listening) {
+                    try {
+                        fastify.server.close();
+                    } catch (ex) {
+                        fastify.log.warn({ err: ex }, "Pre-shutdown server.close() failed");
+                    }
+                    if (typeof fastify.server.closeAllConnections === "function") {
+                        try {
+                            fastify.server.closeAllConnections();
+                        } catch (ex) {
+                            fastify.log.warn(
+                                { err: ex },
+                                "Pre-shutdown closeAllConnections() failed",
+                            );
+                        }
+                    }
+                }
+
                 let hookError = null;
                 if (typeof hooks.onShutdown === "function") {
                     try {
