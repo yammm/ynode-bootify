@@ -9,8 +9,8 @@ import { listen, resolveListenRetry } from "./listen.js";
 /**
  * Extracts a Fastify plugin function from the app module result.
  * Accepts either a bare function or a module with a `default` export.
- * @param {Function|object} appResult - Return value of the app() function.
- * @returns {Function} Fastify plugin function.
+ * @param {function|object} appResult - Return value of the app() function.
+ * @returns {function(object, object): Promise<void>} Fastify plugin function.
  */
 function resolveAppPlugin(appResult) {
     let appPlugin = appResult;

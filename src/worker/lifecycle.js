@@ -35,7 +35,7 @@ export function resolveListenAddress(server) {
  * @param {object} [options.hooks] - Lifecycle hooks (onShutdown).
  * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
  * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
- * @returns {{ lifecycleContext: object, gracefulShutdown: Function, dispose: Function }}
+ * @returns {{ lifecycleContext: object, gracefulShutdown: function(string=): Promise<void>, dispose: function(): void }}
  */
 export function createLifecycleController({
     fastify,
@@ -167,7 +167,17 @@ export function createLifecycleController({
         worker.on("message", workerMessageHandler);
     }
 
+    // dispose is wired into both fastify.onClose (via start.js) and
+    // start.js's own try/finally cleanup path, so it can fire twice in
+    // the same shutdown. Today the double-call is safe by coincidence
+    // (off() on an already-removed listener is a no-op), but a flag
+    // future-proofs this against any side effect that might be added.
+    let disposed = false;
     const dispose = () => {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
         for (const [signal, handler] of signalHandlers) {
             off(signalTarget, signal, handler);
         }

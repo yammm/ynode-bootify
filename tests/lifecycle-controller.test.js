@@ -104,6 +104,28 @@ test("createLifecycleController dispose removes signal listeners", () => {
     assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
 });
 
+test("createLifecycleController dispose is idempotent", () => {
+    const signalTarget = new EventEmitter();
+    const worker = new EventEmitter();
+    worker.disconnect = () => {};
+    const fastify = createFastifyDouble();
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget,
+        worker,
+    });
+
+    controller.dispose();
+    // dispose is wired into both fastify.onClose and start.js's
+    // try/finally cleanup path; calling it a second time must be a no-op.
+    assert.doesNotThrow(() => controller.dispose());
+    assert.strictEqual(signalTarget.listenerCount("SIGINT"), 0);
+    assert.strictEqual(worker.listenerCount("message"), 0);
+});
+
 test("createLifecycleController still closes fastify when onShutdown hook throws", async () => {
     const signalTarget = new EventEmitter();
     const fastify = createFastifyDouble();

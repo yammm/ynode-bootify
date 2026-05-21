@@ -157,11 +157,11 @@ export function resolveListenRetry(config = {}) {
 
 /**
  * Retries an async operation with fixed delay between attempts.
- * @param {Function} operation - Async function to attempt.
+ * @param {function(): Promise<*>} operation - Async function to attempt.
  * @param {object} [options] - Retry options.
  * @param {number} [options.retries=5] - Maximum number of attempts.
  * @param {number} [options.delay=100] - Delay in milliseconds between retries.
- * @param {Function} [options.onRetry] - Callback invoked on each retry with (error, attempt, delay).
+ * @param {function(Error, number, number): void} [options.onRetry] - Callback invoked on each retry with (error, attempt, delay).
  * @returns {Promise<*>} Result of the successful operation.
  */
 async function retryOperation(operation, { retries = 5, delay = 100, onRetry } = {}) {
