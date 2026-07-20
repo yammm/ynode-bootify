@@ -82,7 +82,7 @@
         "LICENSE"
     ],
     "dependencies": {
-        "@ynode/autoshutdown": "^1.7.0",
+        "@ynode/autoshutdown": "^1.8.0",
         "@ynode/cluster": "^1.10.0",
         "@ynode/ylog": "^1.4.0",
         "mkpidfile": "^1.0.1",
