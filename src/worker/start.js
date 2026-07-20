@@ -37,6 +37,7 @@ function resolveAppPlugin(appResult) {
  * @param {object} context.pkg - Package.json content
  * @param {object} [context.hooks] - Optional lifecycle hooks
  * @param {object} [context._internal] - Internal test hooks
+ * @returns {Promise<void>}
  */
 export async function start({ app, config, log, pkg, hooks = {}, _internal = {} }) {
     const createServerFn = _internal.createServer ?? createServer;
@@ -59,15 +60,20 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
     fastify.decorate("clusterMaxWorkers", 1);
     fastify.decorate("clusterMode", "smart");
 
-    const lifecycleContext = { fastify, config, pkg };
+    let lifecycleContext = { fastify, config, pkg };
     let gracefulShutdown = null;
+    let shutdownWithTimeout = null;
+    let shutdownSignal;
     let handleFastifyClose = null;
     let dispose = () => {};
     let startupShutdownSignal = "startup-error";
 
     try {
         const controller = lifecycleControllerFactory({ fastify, config, pkg, hooks });
+        lifecycleContext = controller.lifecycleContext ?? lifecycleContext;
         gracefulShutdown = controller.gracefulShutdown;
+        shutdownWithTimeout = controller.shutdownWithTimeout;
+        shutdownSignal = controller.shutdownSignal;
         handleFastifyClose = controller.handleFastifyClose;
         dispose = controller.dispose;
 
@@ -106,7 +112,7 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
         }
 
         const retry = resolveListenRetry(config);
-        await listenFn(fastify, retry.retries, retry.delay);
+        await listenFn(fastify, retry.retries, retry.delay, { signal: shutdownSignal });
 
         if (typeof hooks.onAfterListen === "function") {
             try {
@@ -120,8 +126,13 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
             }
         }
     } catch (ex) {
+        const interruptedByShutdown =
+            shutdownSignal?.aborted === true &&
+            (ex === shutdownSignal.reason || ex?.name === "AbortError");
         try {
-            if (gracefulShutdown) {
+            if (shutdownWithTimeout) {
+                await shutdownWithTimeout(startupShutdownSignal);
+            } else if (gracefulShutdown) {
                 await gracefulShutdown(startupShutdownSignal);
             } else {
                 await fastify.close();
@@ -130,6 +141,9 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
             fastify.log.error(shutdownEx, "Error during startup cleanup.");
         } finally {
             dispose();
+        }
+        if (interruptedByShutdown) {
+            return;
         }
         throw ex;
     }

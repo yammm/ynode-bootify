@@ -45,9 +45,9 @@ export default yargs(hideBin(process.argv))
         type: "string",
     })
     .option("sleep", {
-        describe: "Shutdown sleep duration in ms",
+        describe: "Idle shutdown period in seconds",
         type: "number",
-        default: 5000,
+        default: 5,
     })
     .option("listenRetry", {
         describe: 'Listen retry policy as JSON (e.g. \'{"retries":3,"delay":1000}\')',

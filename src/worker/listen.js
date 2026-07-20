@@ -2,6 +2,8 @@
  * @fileoverview worker/listen.js: Listen parsing and startup retry utilities.
  */
 
+import { setTimeout as wait } from "node:timers/promises";
+
 /**
  * Parses and validates a port number.
  * @param {string|number} port - Raw port value.
@@ -89,6 +91,11 @@ function parseListenObject(listen) {
     return listenConfig;
 }
 
+/**
+ * Parses a supported listen value into Fastify's object-form listen options.
+ * @param {string|number|object} listen - Port, host/port, socket path, or listen options.
+ * @returns {object} Normalized Fastify listen options.
+ */
 export function parseListenConfig(listen) {
     if (listen && typeof listen === "object" && !Array.isArray(listen)) {
         return parseListenObject(listen);
@@ -129,6 +136,11 @@ export function parseListenConfig(listen) {
     );
 }
 
+/**
+ * Resolves and validates the startup listen retry policy.
+ * @param {object} [config] - Bootify configuration.
+ * @returns {{ retries: number, delay: number }} Retry attempts and delay in milliseconds.
+ */
 export function resolveListenRetry(config = {}) {
     const defaults = { retries: 5, delay: 15000 };
     const retry = config.listenRetry;
@@ -162,49 +174,65 @@ export function resolveListenRetry(config = {}) {
  * @param {number} [options.retries=5] - Maximum number of attempts.
  * @param {number} [options.delay=100] - Delay in milliseconds between retries.
  * @param {function(Error, number, number): void} [options.onRetry] - Callback invoked on each retry with (error, attempt, delay).
+ * @param {AbortSignal} [options.signal] - Cancels pending retries during shutdown.
  * @returns {Promise<*>} Result of the successful operation.
  */
-async function retryOperation(operation, { retries = 5, delay = 100, onRetry } = {}) {
+async function retryOperation(operation, { retries = 5, delay = 100, onRetry, signal } = {}) {
     for (let attempt = 1; attempt <= retries; ++attempt) {
         try {
-            return await operation();
+            signal?.throwIfAborted();
+            const result = await operation();
+            signal?.throwIfAborted();
+            return result;
         } catch (ex) {
+            signal?.throwIfAborted();
             if (attempt >= retries) {
                 throw ex;
             }
             if (onRetry) {
                 onRetry(ex, attempt, delay);
             }
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            // Startup retries intentionally keep the process alive, but shutdown can cancel them.
+            await wait(delay, undefined, { signal });
         }
     }
 }
 
 /**
  * Tell Fastify to start listening with retry logic.
+ * @param {object} fastify - Fastify instance.
+ * @param {number} [retries=5] - Maximum number of listen attempts.
+ * @param {number} [delay=100] - Delay in milliseconds between attempts.
+ * @param {object} [options] - Listen execution options.
+ * @param {AbortSignal} [options.signal] - Cancels retries during shutdown.
+ * @returns {Promise<void>}
  */
-export async function listen(fastify, retries = 5, delay = 100) {
+export async function listen(fastify, retries = 5, delay = 100, { signal } = {}) {
     const config = fastify.config;
     const pkg = fastify.pkg;
 
     const listenConfig = parseListenConfig(config.listen);
+    const environment = config.environment ? ` in ${config.environment} mode` : "";
 
     listenConfig.listenTextResolver = (address) =>
-        `Moshi moshi ${pkg.name} v${pkg.version} in ${config.environment} mode listening on ${address}`;
+        `Moshi moshi ${pkg.name} v${pkg.version}${environment} listening on ${address}`;
 
     try {
         await retryOperation(() => fastify.listen(listenConfig), {
             retries,
             delay,
+            signal,
             onRetry: (ex, attempt, nextDelay) => {
                 fastify.log.warn(
-                    `Attempt ${attempt} failed: ${ex.message}. Retrying in ${nextDelay}ms...`,
-                    ex,
+                    { err: ex },
+                    `Attempt ${attempt} failed. Retrying in ${nextDelay}ms...`,
                 );
             },
         });
     } catch (ex) {
-        fastify.log.error("All startup listen attempts exhausted.");
+        if (!signal?.aborted) {
+            fastify.log.error("All startup listen attempts exhausted.");
+        }
         throw ex;
     }
 }

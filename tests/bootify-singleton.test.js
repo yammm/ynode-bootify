@@ -316,3 +316,30 @@ test("bootify passes cluster.tty options through to cluster run()", async () => 
 
     assert.deepStrictEqual(capturedRunOptions, clusterOptions);
 });
+
+test("bootify lets the validator normalize cluster config before resolving options", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    const config = { cluster: null };
+    let capturedRunOptions = null;
+
+    await bootify({
+        app: async () => async () => {},
+        config,
+        pkg: { name: "test", version: "1.0.0" },
+        validator: (validatedConfig) => {
+            validatedConfig.cluster = false;
+        },
+        _internal: {
+            process: processTarget,
+            ylog: () => createLogStub(),
+            ...bootifyState,
+            run: async (_startWorker, options) => {
+                capturedRunOptions = options;
+                return {};
+            },
+        },
+    });
+
+    assert.deepStrictEqual(capturedRunOptions, { enabled: false });
+});

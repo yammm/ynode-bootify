@@ -68,8 +68,17 @@ test("createLifecycleController applies worker cluster updates and shutdown comm
         worker,
     });
 
-    worker.emit("message", { cmd: "cluster-count", count: 7 });
+    worker.emit("message", {
+        cmd: "cluster-count",
+        count: 7,
+        minWorkers: 2,
+        maxWorkers: 9,
+        mode: "max",
+    });
     assert.strictEqual(fastify.clusterCount, 7);
+    assert.strictEqual(fastify.clusterMinWorkers, 2);
+    assert.strictEqual(fastify.clusterMaxWorkers, 9);
+    assert.strictEqual(fastify.clusterMode, "max");
 
     worker.emit("message", "shutdown");
     await controller.gracefulShutdown("shutdown");
@@ -304,5 +313,162 @@ test("worker shutdown timeout disconnects and exits non-zero", async () => {
 
     assert.strictEqual(disconnectCalls, 1);
     assert.deepStrictEqual(exitCodes, [1]);
+    controller.dispose();
+});
+
+test("graceful shutdown evicts idle connections without aborting active connections", async () => {
+    const connectionCalls = [];
+    const fastify = createFastifyDouble();
+    fastify.server = {
+        listening: true,
+        close() {
+            connectionCalls.push("close");
+        },
+        closeIdleConnections() {
+            connectionCalls.push("close-idle");
+        },
+        closeAllConnections() {
+            connectionCalls.push("close-all");
+        },
+    };
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget: new EventEmitter(),
+        worker: null,
+    });
+
+    await controller.gracefulShutdown("SIGTERM");
+
+    assert.deepStrictEqual(connectionCalls, ["close", "close-idle"]);
+    assert.strictEqual(fastify.closeCalls, 1);
+    controller.dispose();
+});
+
+test("first OS signal joins an IPC-initiated drain instead of forcing exit", async () => {
+    const signalTarget = new EventEmitter();
+    const exitCodes = [];
+    signalTarget.exit = (code) => exitCodes.push(code);
+    const worker = new EventEmitter();
+    worker.isConnected = () => true;
+    worker.disconnect = () => {};
+    let finishShutdown = null;
+    const shutdownGate = new Promise((resolve) => {
+        finishShutdown = resolve;
+    });
+
+    const controller = createLifecycleController({
+        fastify: createFastifyDouble(),
+        config: { cluster: { shutdownTimeout: 100 } },
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: { onShutdown: () => shutdownGate },
+        signalTarget,
+        processTarget: signalTarget,
+        worker,
+    });
+
+    worker.emit("message", "shutdown");
+    await Promise.resolve();
+    signalTarget.emit("SIGTERM");
+
+    assert.deepStrictEqual(exitCodes, []);
+
+    finishShutdown();
+    await controller.gracefulShutdown("shutdown");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepStrictEqual(exitCodes, [0]);
+    controller.dispose();
+});
+
+test("second OS signal force-exits an already signaled worker", async () => {
+    const signalTarget = new EventEmitter();
+    const exitCodes = [];
+    signalTarget.exit = (code) => exitCodes.push(code);
+    let finishShutdown = null;
+    const shutdownGate = new Promise((resolve) => {
+        finishShutdown = resolve;
+    });
+
+    const controller = createLifecycleController({
+        fastify: createFastifyDouble(),
+        config: { cluster: { shutdownTimeout: 100 } },
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: { onShutdown: () => shutdownGate },
+        signalTarget,
+        processTarget: signalTarget,
+        worker: null,
+    });
+
+    signalTarget.emit("SIGTERM");
+    signalTarget.emit("SIGINT");
+
+    assert.deepStrictEqual(exitCodes, [1]);
+
+    finishShutdown();
+    await controller.gracefulShutdown("SIGTERM");
+    controller.dispose();
+});
+
+test("worker reply delivery failures are logged instead of escaping", () => {
+    const signalTarget = new EventEmitter();
+    const worker = new EventEmitter();
+    const deliveryError = new Error("channel closed");
+    const replies = [];
+    worker.send = (message, callback) => {
+        replies.push(message);
+        callback(deliveryError);
+    };
+    const warnings = [];
+    const fastify = createFastifyDouble();
+    fastify.log.warn = (...args) => warnings.push(args);
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.2.3" },
+        signalTarget,
+        worker,
+    });
+
+    worker.emit("message", { cmd: "ping" });
+    worker.emit("message", { cmd: "version" });
+
+    assert.strictEqual(replies.length, 2);
+    assert.strictEqual(replies[0].cmd, "ping");
+    assert.deepStrictEqual(replies[1], {
+        cmd: "version",
+        appVersion: "1.2.3",
+        nodeVersion: process.version,
+    });
+    assert.strictEqual(warnings.length, 2);
+    assert.deepStrictEqual(warnings[0][0], { err: deliveryError });
+    assert.match(warnings[0][1], /ping reply/);
+    assert.match(warnings[1][1], /version reply/);
+    controller.dispose();
+});
+
+test("synchronous worker reply failures are logged instead of escaping", () => {
+    const worker = new EventEmitter();
+    const sendError = new Error("send failed");
+    worker.send = () => {
+        throw sendError;
+    };
+    const warnings = [];
+    const fastify = createFastifyDouble();
+    fastify.log.warn = (...args) => warnings.push(args);
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget: new EventEmitter(),
+        worker,
+    });
+
+    assert.doesNotThrow(() => worker.emit("message", { cmd: "ping" }));
+    assert.deepStrictEqual(warnings, [[{ err: sendError }, "Failed to send worker ping reply."]]);
     controller.dispose();
 });

@@ -16,6 +16,8 @@ A Fastify bootstrap plugin that incorporates standardized @ynode patterns for cl
 
 ## Installation
 
+Requires Node.js 20.10.0 or newer.
+
 ```sh
 npm install @ynode/bootify
 ```
@@ -59,7 +61,8 @@ try {
 
 The `config` object is typically the resolved output of `yargs`. It supports the following reserved properties:
 
-- `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object). This object is passed through to `@ynode/cluster` options. When omitted, clustering defaults to enabled; set `cluster: false` to force single-process mode.
+- `cluster`: Configuration for `@ynode/cluster` (can be a boolean or object). This object is passed through to `@ynode/cluster` options. When omitted, clustering defaults to enabled; set `cluster: false` to force single-process mode. Other values are rejected after the optional configuration validator runs.
+- `environment`: Optional environment label included in the startup listen message.
 - `pidfile`: Path to write the PID file (optional).
 - `http2`: Enable HTTP/2 support (boolean).
 - `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.
@@ -112,7 +115,7 @@ For a production deployment behind a reverse proxy, combine `trustProxy`, explic
 
 ### Unix Domain Sockets & `proxiable`
 
-If you bind to a Unix Domain Socket by setting `listen` to a socket path (for example `"/tmp/app.sock"` or `{ path: "/tmp/app.sock" }`), `bootify` automatically uses [`proxiable`](https://www.npmjs.com/package/proxiable) on the raw server instance. This fixes common issues where `req.socket.remoteAddress` is undefined or incorrect when running behind a proxy like Nginx over a socket.
+`bootify` applies [`proxiable`](https://www.npmjs.com/package/proxiable) to the raw server instance. For Unix Domain Socket listeners such as `"/tmp/app.sock"` or `{ path: "/tmp/app.sock" }`, it removes orphaned socket files before binding, makes the bound socket proxy-accessible, and ensures the socket is unlinked during process cleanup. TCP listeners are unaffected.
 
 ## API
 
@@ -169,6 +172,7 @@ Behavior:
 - A second call while `starting` throws `bootify() is already starting in this process.`
 - A call after successful startup (`started`) throws `bootify() can only be called once per process.`
 - If startup fails, state is reset back to `idle` and a later retry is allowed.
+- Startup cleanup is bounded by `config.cluster.shutdownTimeout`. A shutdown received during a listen retry cancels the pending delay and prevents another listen attempt.
 
 ## License
 

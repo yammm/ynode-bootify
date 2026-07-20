@@ -87,3 +87,24 @@ test("bootify rejects invalid hooks.onAfterListen option", async () => {
         /Invalid "hooks\.onAfterListen" option/,
     );
 });
+
+test("bootify rejects null cluster configuration instead of enabling clustering", async () => {
+    let runCalls = 0;
+
+    await expectTypeError(
+        () =>
+            bootify({
+                app: async () => async () => {},
+                config: { cluster: null },
+                pkg: {},
+                _internal: {
+                    run: async () => {
+                        runCalls += 1;
+                    },
+                },
+            }),
+        /Invalid "config\.cluster" option/,
+    );
+
+    assert.strictEqual(runCalls, 0);
+});

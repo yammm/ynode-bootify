@@ -38,7 +38,7 @@
         "ynode"
     ],
     "engines": {
-        "node": ">=20"
+        "node": ">=20.10.0"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

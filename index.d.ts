@@ -11,10 +11,11 @@ import type {
     ClusterOptions,
     ClusterTtyOptions,
 } from "@ynode/cluster";
-import { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from "fastify";
 
-type AppModule = { default: FastifyPluginAsync };
-type AppPlugin = FastifyPluginAsync | AppModule;
+type FastifyAppPlugin = FastifyPluginAsync | FastifyPluginCallback;
+type AppModule = { default: FastifyAppPlugin };
+type AppPlugin = FastifyAppPlugin | AppModule;
 
 export interface ListenOptions {
     host?: string;
@@ -51,6 +52,7 @@ export interface BootifyAutoshutdownOptions {
 
 export interface BootifyConfig extends Record<string, any> {
     cluster?: boolean | BootifyClusterOptions;
+    environment?: string;
     pidfile?: string;
     http2?: boolean;
     trustProxy?: boolean | string | number | Record<string, any>;
@@ -83,7 +85,7 @@ export interface BootifyHooks {
 export interface BootOptions {
     /**
      * A function that imports and returns the application entry point.
-     * The module must export the Fastify plugin as `default`.
+     * Accepts a bare Fastify plugin or a module that exports one as `default`.
      */
     app: (fastify: FastifyInstance, config: BootifyConfig) => Promise<AppPlugin> | AppPlugin;
 

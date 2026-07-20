@@ -41,7 +41,7 @@ export function resolveListenAddress(server) {
  * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
  * @param {object} [options.processTarget] - Process-like target for worker exit (default: signalTarget).
  * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
- * @returns {{ lifecycleContext: object, gracefulShutdown: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
+ * @returns {{ lifecycleContext: object, shutdownSignal: AbortSignal, gracefulShutdown: function(string=): Promise<void>, shutdownWithTimeout: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
  */
 export function createLifecycleController({
     fastify,
@@ -53,6 +53,12 @@ export function createLifecycleController({
     worker = cluster.worker,
 }) {
     const lifecycleContext = { fastify, config, pkg };
+    const shutdownController = new AbortController();
+    const beginShutdown = () => {
+        if (!shutdownController.signal.aborted) {
+            shutdownController.abort();
+        }
+    };
 
     let shutdownHookPromise = null;
     let shutdownHookErrorHandled = false;
@@ -69,29 +75,30 @@ export function createLifecycleController({
 
     let shutdownPromise = null;
     const gracefulShutdown = async (signal) => {
+        beginShutdown();
         if (!shutdownPromise) {
             shutdownPromise = (async () => {
                 // Drop out of the cluster master's round-robin pool and
-                // evict every existing client connection before Fastify
+                // evict idle keep-alive connections before Fastify
                 // flips into closing-state. fastify.close() does these
                 // eventually, but only after preClose hooks (Mongoose,
                 // Redis, etc.) finish — and during that window the router
                 // rejects every keep-alive request with 503. Doing it up
-                // front means clients reconnect cleanly to a healthy
-                // worker instead.
+                // front means idle clients reconnect cleanly to a healthy
+                // worker while active responses finish draining.
                 if (fastify.server?.listening) {
                     try {
                         fastify.server.close();
                     } catch (ex) {
                         fastify.log.warn({ err: ex }, "Pre-shutdown server.close() failed");
                     }
-                    if (typeof fastify.server.closeAllConnections === "function") {
+                    if (typeof fastify.server.closeIdleConnections === "function") {
                         try {
-                            fastify.server.closeAllConnections();
+                            fastify.server.closeIdleConnections();
                         } catch (ex) {
                             fastify.log.warn(
                                 { err: ex },
-                                "Pre-shutdown closeAllConnections() failed",
+                                "Pre-shutdown closeIdleConnections() failed",
                             );
                         }
                     }
@@ -133,6 +140,25 @@ export function createLifecycleController({
         Number.isFinite(configuredShutdownTimeout) && configuredShutdownTimeout >= 0
             ? configuredShutdownTimeout
             : 10000;
+
+    const shutdownWithTimeout = async (signal) => {
+        let timeout = null;
+        try {
+            const timeoutPromise = new Promise((_, reject) => {
+                timeout = setTimeout(() => {
+                    reject(
+                        new Error(`Worker shutdown after ${signal} exceeded ${shutdownTimeout}ms`),
+                    );
+                }, shutdownTimeout);
+            });
+            await Promise.race([gracefulShutdown(signal), timeoutPromise]);
+        } finally {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+        }
+    };
+
     let exitAfterShutdown = false;
     let terminationPromise = null;
 
@@ -141,26 +167,11 @@ export function createLifecycleController({
         if (!terminationPromise) {
             terminationPromise = (async () => {
                 let shutdownError = null;
-                let timeout = null;
                 try {
-                    const timeoutPromise = new Promise((_, reject) => {
-                        timeout = setTimeout(() => {
-                            reject(
-                                new Error(
-                                    `Worker shutdown after ${signal} exceeded ${shutdownTimeout}ms`,
-                                ),
-                            );
-                        }, shutdownTimeout);
-                        timeout.unref();
-                    });
-                    await Promise.race([gracefulShutdown(signal), timeoutPromise]);
+                    await shutdownWithTimeout(signal);
                 } catch (ex) {
                     shutdownError = ex;
                     fastify.log.error(ex, `Error during shutdown after ${signal}`);
-                } finally {
-                    if (timeout) {
-                        clearTimeout(timeout);
-                    }
                 }
 
                 if (worker && (typeof worker.isConnected !== "function" || worker.isConnected())) {
@@ -186,13 +197,15 @@ export function createLifecycleController({
     };
 
     const signalHandlers = new Map();
+    let signalReceived = false;
     for (const signal of WORKER_SHUTDOWN_SIGNALS) {
         const handler = () => {
-            if (terminationPromise && typeof processTarget.exit === "function") {
+            if (signalReceived && typeof processTarget.exit === "function") {
                 fastify.log.warn(`Received ${signal} again; forcing worker exit.`);
                 processTarget.exit(1);
                 return;
             }
+            signalReceived = true;
             void shutdownWorker(signal, { exitAfter: true });
         };
         signalHandlers.set(signal, handler);
@@ -201,6 +214,18 @@ export function createLifecycleController({
 
     let workerMessageHandler = null;
     if (worker) {
+        const sendWorkerReply = (message) => {
+            try {
+                worker.send(message, (err) => {
+                    if (err) {
+                        fastify.log.warn({ err }, `Failed to send worker ${message.cmd} reply.`);
+                    }
+                });
+            } catch (ex) {
+                fastify.log.warn({ err: ex }, `Failed to send worker ${message.cmd} reply.`);
+            }
+        };
+
         workerMessageHandler = async (msg) => {
             if (msg && typeof msg === "object") {
                 if (msg.cmd === "cluster-count") {
@@ -225,12 +250,12 @@ export function createLifecycleController({
                 }
 
                 if (msg.cmd === "ping") {
-                    worker.send({ cmd: "ping", ts: Date.now() });
+                    sendWorkerReply({ cmd: "ping", ts: Date.now() });
                     return;
                 }
 
                 if (msg.cmd === "version") {
-                    worker.send({
+                    sendWorkerReply({
                         cmd: "version",
                         appVersion: pkg?.version ?? null,
                         nodeVersion: process.version,
@@ -267,10 +292,12 @@ export function createLifecycleController({
     };
 
     const handleAutoShutdownStart = async (event = {}) => {
+        beginShutdown();
         await runShutdownHook(event.trigger ?? "autoshutdown");
     };
 
     const handleFastifyClose = async () => {
+        beginShutdown();
         let hookError = null;
         try {
             await runShutdownHook("fastify-close");
@@ -287,7 +314,9 @@ export function createLifecycleController({
 
     return {
         lifecycleContext,
+        shutdownSignal: shutdownController.signal,
         gracefulShutdown,
+        shutdownWithTimeout,
         handleAutoShutdownStart,
         handleFastifyClose,
         dispose,

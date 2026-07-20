@@ -92,15 +92,31 @@ function validateHooks(hooks) {
 }
 
 /**
+ * Normalizes the Cluster configuration passed to @ynode/cluster.
+ * @param {boolean|object|undefined} clusterConfig - Bootify Cluster configuration.
+ * @returns {object} Cluster run options.
+ */
+function resolveClusterOptions(clusterConfig) {
+    if (clusterConfig === undefined || typeof clusterConfig === "boolean") {
+        return { enabled: clusterConfig };
+    }
+    if (isObject(clusterConfig)) {
+        return { ...clusterConfig };
+    }
+    throw new TypeError('Invalid "config.cluster" option. Expected a boolean or object.');
+}
+
+/**
  * Main entry point
  * @param {object} options
- * @param {function} options.app - Function returning Promise<{default: plugin}>.
+ * @param {function} options.app - Function returning a Fastify plugin or a module with a default plugin export.
  * @param {object} options.config - The configuration object (argv).
  * @param {object} [options.pkg] - Optional package.json object, default is to load from `${process.cwd()}/package.json`.
  * @param {object} [options.tty] - Backward-compatible top-level Cluster TTY options.
  * @param {function} [options.validator] - Optional function to validate `config` before starting.
  * @param {object} [options.hooks] - Optional lifecycle hooks.
  * @param {object} [options._internal] - Internal test hooks.
+ * @returns {Promise<object|void>} Cluster manager in the primary process, otherwise void.
  */
 export async function bootify({ app, config, pkg, tty, validator, hooks, _internal = {} }) {
     const processTarget = _internal.process ?? process;
@@ -145,6 +161,7 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
     }
     setBootifyStateFn("starting");
 
+    let runOptions;
     let exitHandler = null;
     let sighupHandler = null;
     let handlersRemoved = false;
@@ -165,6 +182,7 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
         if (validator) {
             await validator(config);
         }
+        runOptions = resolveClusterOptions(config.cluster);
 
         // Fail before forking workers if Bootify and Cluster would otherwise
         // compete for worker heartbeat, memory, or process lifecycle ownership.
@@ -190,9 +208,6 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
             mkpidfile(config.pidfile);
         }
 
-        const runOptions = {
-            ...(typeof config.cluster === "object" ? config.cluster : { enabled: config.cluster }),
-        };
         if (tty !== undefined) {
             runOptions.tty = tty;
         }
