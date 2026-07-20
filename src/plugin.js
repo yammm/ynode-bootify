@@ -38,6 +38,7 @@ import { run } from "@ynode/cluster";
 // logging
 import ylog from "@ynode/ylog";
 
+import { buildAutoshutdownOptions } from "./autoshutdown.js";
 import { off } from "./events.js";
 import { start } from "./worker.js";
 
@@ -164,6 +165,10 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
         if (validator) {
             await validator(config);
         }
+
+        // Fail before forking workers if Bootify and Cluster would otherwise
+        // compete for worker heartbeat, memory, or process lifecycle ownership.
+        buildAutoshutdownOptions(config);
 
         if (!pkg) {
             const pkgUrl = pathToFileURL(join(process.cwd(), "package.json")).href;

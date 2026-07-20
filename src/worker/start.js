@@ -61,17 +61,39 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
 
     const lifecycleContext = { fastify, config, pkg };
     let gracefulShutdown = null;
+    let handleFastifyClose = null;
     let dispose = () => {};
     let startupShutdownSignal = "startup-error";
 
     try {
         const controller = lifecycleControllerFactory({ fastify, config, pkg, hooks });
         gracefulShutdown = controller.gracefulShutdown;
+        handleFastifyClose = controller.handleFastifyClose;
         dispose = controller.dispose;
 
         fastify.addHook("onClose", async () => {
-            dispose();
+            if (handleFastifyClose) {
+                await handleFastifyClose();
+            } else {
+                dispose();
+            }
         });
+
+        const registerAutoShutdownHook = () => {
+            if (typeof fastify.onAutoShutdownStart === "function") {
+                fastify.onAutoShutdownStart(controller.handleAutoShutdownStart);
+            }
+        };
+        if (typeof fastify.onAutoShutdownStart === "function") {
+            registerAutoShutdownHook();
+        } else if (typeof fastify.after === "function") {
+            fastify.after((err) => {
+                if (err) {
+                    throw err;
+                }
+                registerAutoShutdownHook();
+            });
+        }
 
         // resolve app plugin
         const appPlugin = resolveAppPlugin(await app(fastify, config));

@@ -78,15 +78,46 @@ test("createServer registers autoshutdown only for worker processes", async () =
 });
 
 test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
-    assert.deepStrictEqual(buildAutoshutdownOptions({}), {});
+    const ownedDefaults = {
+        exitProcess: true,
+        reportLoad: false,
+        memoryLimit: 0,
+    };
+    assert.deepStrictEqual(buildAutoshutdownOptions({}), ownedDefaults);
     assert.deepStrictEqual(buildAutoshutdownOptions({ sleep: 45, reportLoad: true }), {
         sleep: 45,
+        ...ownedDefaults,
     });
     assert.deepStrictEqual(
         buildAutoshutdownOptions({
-            sleep: { sleep: 45, grace: 5, jitter: 0, memoryLimit: 512 },
+            sleep: { sleep: 45, grace: 5, jitter: 0, closeTimeout: 2500 },
         }),
-        { sleep: 45, grace: 5, jitter: 0, memoryLimit: 512 },
+        { sleep: 45, grace: 5, jitter: 0, closeTimeout: 2500, ...ownedDefaults },
+    );
+});
+
+test("buildAutoshutdownOptions rejects Cluster-owned and unsupported settings", () => {
+    for (const [name, value] of [
+        ["exitProcess", false],
+        ["reportLoad", true],
+        ["heartbeatInterval", 1000],
+        ["memoryLimit", 512],
+    ]) {
+        assert.throws(
+            () => buildAutoshutdownOptions({ sleep: { sleep: 45, [name]: value } }),
+            new RegExp(`config\\.sleep\\.${name}`),
+        );
+    }
+
+    assert.throws(
+        () => buildAutoshutdownOptions({ sleep: { sleep: 45, typo: true } }),
+        /config\.sleep\.typo.*Unsupported option/,
+    );
+    assert.throws(() => buildAutoshutdownOptions({ sleep: false }), /config\.sleep/);
+    assert.throws(() => buildAutoshutdownOptions({ sleep: 0 }), /positive inactivity period/);
+    assert.deepStrictEqual(
+        buildAutoshutdownOptions({ sleep: { sleep: 45, reportLoad: undefined } }),
+        { sleep: 45, exitProcess: true, reportLoad: false, memoryLimit: 0 },
     );
 });
 

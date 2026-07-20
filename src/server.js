@@ -15,24 +15,10 @@ import autoshutdown from "@ynode/autoshutdown";
 import Fastify from "fastify";
 import proxiable from "proxiable";
 
+import { buildAutoshutdownOptions } from "./autoshutdown.js";
 import { rewriteUrl } from "./rewrite.js";
 
-/**
- * Builds the autoshutdown options used for worker processes.
- * Cluster workers already report load directly to the master, so bootify only
- * forwards idle-shutdown configuration here.
- * @param {object} [config={}] - The configuration object from yargs.
- * @returns {object} Normalized autoshutdown options.
- */
-export function buildAutoshutdownOptions(config = {}) {
-    if (config.sleep === undefined) {
-        return {};
-    }
-    if (config.sleep !== null && typeof config.sleep === "object" && !Array.isArray(config.sleep)) {
-        return { ...config.sleep };
-    }
-    return { sleep: config.sleep };
-}
+export { buildAutoshutdownOptions } from "./autoshutdown.js";
 
 /**
  * Creates and configures a Fastify server instance.

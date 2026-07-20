@@ -41,7 +41,7 @@ export function resolveListenAddress(server) {
  * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
  * @param {object} [options.processTarget] - Process-like target for worker exit (default: signalTarget).
  * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
- * @returns {{ lifecycleContext: object, gracefulShutdown: function(string=): Promise<void>, dispose: function(): void }}
+ * @returns {{ lifecycleContext: object, gracefulShutdown: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
  */
 export function createLifecycleController({
     fastify,
@@ -53,6 +53,19 @@ export function createLifecycleController({
     worker = cluster.worker,
 }) {
     const lifecycleContext = { fastify, config, pkg };
+
+    let shutdownHookPromise = null;
+    let shutdownHookErrorHandled = false;
+    const runShutdownHook = (signal) => {
+        if (!shutdownHookPromise) {
+            shutdownHookPromise = Promise.resolve().then(async () => {
+                if (typeof hooks.onShutdown === "function") {
+                    await hooks.onShutdown({ ...lifecycleContext, signal });
+                }
+            });
+        }
+        return shutdownHookPromise;
+    };
 
     let shutdownPromise = null;
     const gracefulShutdown = async (signal) => {
@@ -85,12 +98,11 @@ export function createLifecycleController({
                 }
 
                 let hookError = null;
-                if (typeof hooks.onShutdown === "function") {
-                    try {
-                        await hooks.onShutdown({ ...lifecycleContext, signal });
-                    } catch (ex) {
-                        hookError = ex;
-                    }
+                try {
+                    await runShutdownHook(signal);
+                } catch (ex) {
+                    hookError = ex;
+                    shutdownHookErrorHandled = true;
                 }
 
                 let closeError = null;
@@ -254,5 +266,30 @@ export function createLifecycleController({
         }
     };
 
-    return { lifecycleContext, gracefulShutdown, dispose };
+    const handleAutoShutdownStart = async (event = {}) => {
+        await runShutdownHook(event.trigger ?? "autoshutdown");
+    };
+
+    const handleFastifyClose = async () => {
+        let hookError = null;
+        try {
+            await runShutdownHook("fastify-close");
+        } catch (ex) {
+            hookError = ex;
+        } finally {
+            dispose();
+        }
+
+        if (hookError && !shutdownHookErrorHandled) {
+            throw hookError;
+        }
+    };
+
+    return {
+        lifecycleContext,
+        gracefulShutdown,
+        handleAutoShutdownStart,
+        handleFastifyClose,
+        dispose,
+    };
 }

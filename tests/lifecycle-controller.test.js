@@ -147,7 +147,53 @@ test("createLifecycleController still closes fastify when onShutdown hook throws
 
     await assert.rejects(() => controller.gracefulShutdown("SIGTERM"), /hook-failed/);
     assert.strictEqual(fastify.closeCalls, 1);
+    await controller.handleFastifyClose();
 
+    controller.dispose();
+});
+
+test("autoshutdown and Fastify close run the application shutdown hook exactly once", async () => {
+    const signalTarget = new EventEmitter();
+    const fastify = createFastifyDouble();
+    const shutdownSignals = [];
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onShutdown: ({ signal }) => shutdownSignals.push(signal),
+        },
+        signalTarget,
+        worker: null,
+    });
+
+    await controller.handleAutoShutdownStart({ trigger: "idle_timer" });
+    await controller.handleFastifyClose();
+    await controller.handleFastifyClose();
+
+    assert.deepStrictEqual(shutdownSignals, ["idle_timer"]);
+    assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
+});
+
+test("Fastify close surfaces an autoshutdown hook failure once", async () => {
+    const controller = createLifecycleController({
+        fastify: createFastifyDouble(),
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onShutdown: () => {
+                throw new Error("autoshutdown-hook-failed");
+            },
+        },
+        signalTarget: new EventEmitter(),
+        worker: null,
+    });
+
+    await assert.rejects(
+        () => controller.handleAutoShutdownStart({ trigger: "idle_timer" }),
+        /autoshutdown-hook-failed/,
+    );
+    await assert.rejects(() => controller.handleFastifyClose(), /autoshutdown-hook-failed/);
     controller.dispose();
 });
 

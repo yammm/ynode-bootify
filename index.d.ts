@@ -36,13 +36,26 @@ export interface BootifyClusterTtyOptions extends ClusterTtyOptions {}
 
 export interface BootifyClusterOptions extends ClusterOptions {}
 
+export interface BootifyAutoshutdownOptions {
+    sleep?: AutoshutdownOptions["sleep"];
+    grace?: AutoshutdownOptions["grace"];
+    ignoreUrls?: AutoshutdownOptions["ignoreUrls"];
+    ignore?: AutoshutdownOptions["ignore"];
+    jitter?: AutoshutdownOptions["jitter"];
+    force?: AutoshutdownOptions["force"];
+    hookTimeout?: AutoshutdownOptions["hookTimeout"];
+    closeTimeout?: number;
+    onShutdownStart?: AutoshutdownOptions["onShutdownStart"];
+    onShutdownComplete?: AutoshutdownOptions["onShutdownComplete"];
+}
+
 export interface BootifyConfig extends Record<string, any> {
     cluster?: boolean | BootifyClusterOptions;
     pidfile?: string;
     http2?: boolean;
     trustProxy?: boolean | string | number | Record<string, any>;
     rewrite?: Record<string, string>;
-    sleep?: number | AutoshutdownOptions;
+    sleep?: number | BootifyAutoshutdownOptions;
     listen?: string | number | ListenOptions;
     listenRetry?: ListenRetryOptions;
 }

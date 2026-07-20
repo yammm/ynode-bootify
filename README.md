@@ -64,7 +64,7 @@ The `config` object is typically the resolved output of `yargs`. It supports the
 - `http2`: Enable HTTP/2 support (boolean).
 - `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.
 - `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be strings. Non-string values are ignored.
-- `sleep`: An inactivity period in seconds or a complete `@ynode/autoshutdown` options object such as `{ sleep: 1800, grace: 30, jitter: 5 }`.
+- `sleep`: An inactivity period in seconds or an idle-only `@ynode/autoshutdown` options object such as `{ sleep: 1800, grace: 30, jitter: 5, closeTimeout: 10000 }`.
 - `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to `{ retries: 5, delay: 15000 }`.
 
@@ -86,6 +86,13 @@ cluster: {
 ```
 
 Workers also expose the current pool metadata as Fastify decorations: `clusterCount` (active workers, including `0` while shutdown drains the pool), `clusterMinWorkers`, `clusterMaxWorkers`, and `clusterMode`. Cluster count broadcasts include these values after worker, scale, reload, and retirement transitions.
+
+Bootify deliberately owns the boundary between Autoshutdown and Cluster:
+
+- `config.sleep` may configure `sleep`, `grace`, `ignoreUrls`, `ignore`, `jitter`, `force`, `hookTimeout`, `closeTimeout`, `onShutdownStart`, and `onShutdownComplete`.
+- Worker `exitProcess` is always enabled so a closed worker cannot remain connected and count as healthy capacity.
+- `reportLoad`, `heartbeatInterval`, and `memoryLimit` are rejected in `config.sleep`. Configure load and memory policy through `config.cluster` so Cluster is the sole heartbeat, retirement, and replacement owner.
+- Unsupported nested keys fail before Bootify forks workers, preventing crash loops caused by configuration typos.
 
 ### Production Configuration Example
 
@@ -128,7 +135,7 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 
 - `onBeforeListen(context)`: Receives `{ fastify, config, pkg }`.
 - `onAfterListen(context)`: Receives `{ fastify, config, pkg, address }`.
-- `onShutdown(context)`: Receives `{ fastify, config, pkg, signal }`.
+- `onShutdown(context)`: Receives `{ fastify, config, pkg, signal }` and runs exactly once for signal, reload, startup-cleanup, idle-Autoshutdown, and direct Fastify-close paths. Non-signal triggers include `idle_timer`, `startup-error`, and `fastify-close`.
 
 #### Return Value
 
@@ -143,7 +150,7 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 
 ### Signal and Shutdown Semantics
 
-In clustered mode, `@ynode/cluster` is the sole primary-process owner of supported `SIGINT`, `SIGTERM`, and `SIGQUIT` signals. Bootify workers close Fastify, run `onShutdown`, disconnect from the primary, and exit. A worker shutdown that exceeds `config.cluster.shutdownTimeout` exits non-zero so the primary can complete its bounded escalation.
+In clustered mode, `@ynode/cluster` is the sole primary-process owner of supported `SIGINT`, `SIGTERM`, and `SIGQUIT` signals. Bootify workers run `onShutdown` exactly once, close Fastify, disconnect from the primary, and exit. Idle Autoshutdown uses Node's voluntary worker disconnect semantics, allowing a smart pool to shrink without being treated as a crash. A worker shutdown that exceeds `config.cluster.shutdownTimeout` exits non-zero so the primary can complete its bounded escalation.
 
 `SIGQUIT` now performs graceful shutdown. Applications that need a core dump should invoke `process.abort()` explicitly from an operationally controlled path rather than installing a second handler for the same signal.
 
