@@ -173,7 +173,7 @@ test("createLifecycleController ignores null worker messages", async () => {
     controller.dispose();
 });
 
-test("createLifecycleController ignores invalid cluster-count payloads", async () => {
+test("createLifecycleController accepts zero and ignores invalid cluster-count payloads", async () => {
     const signalTarget = new EventEmitter();
     const worker = new EventEmitter();
     const fastify = createFastifyDouble();
@@ -187,11 +187,13 @@ test("createLifecycleController ignores invalid cluster-count payloads", async (
     });
 
     worker.emit("message", { cmd: "cluster-count", count: 0 });
+    assert.strictEqual(fastify.clusterCount, 0);
+
     worker.emit("message", { cmd: "cluster-count", count: -1 });
     worker.emit("message", { cmd: "cluster-count", count: "2" });
     await Promise.resolve();
 
-    assert.strictEqual(fastify.clusterCount, 1);
+    assert.strictEqual(fastify.clusterCount, 0);
 
     worker.emit("message", { cmd: "cluster-count", count: 4 });
     assert.strictEqual(fastify.clusterCount, 4);

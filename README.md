@@ -85,7 +85,7 @@ cluster: {
 }
 ```
 
-Workers also expose the current pool metadata as Fastify decorations: `clusterCount` (active workers), `clusterMinWorkers`, `clusterMaxWorkers`, and `clusterMode`. Cluster count broadcasts include these values after worker, scale, reload, and retirement transitions.
+Workers also expose the current pool metadata as Fastify decorations: `clusterCount` (active workers, including `0` while shutdown drains the pool), `clusterMinWorkers`, `clusterMaxWorkers`, and `clusterMode`. Cluster count broadcasts include these values after worker, scale, reload, and retirement transitions.
 
 ### Production Configuration Example
 

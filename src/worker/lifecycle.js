@@ -192,7 +192,7 @@ export function createLifecycleController({
         workerMessageHandler = async (msg) => {
             if (msg && typeof msg === "object") {
                 if (msg.cmd === "cluster-count") {
-                    if (Number.isInteger(msg.count) && msg.count > 0) {
+                    if (Number.isInteger(msg.count) && msg.count >= 0) {
                         fastify.clusterCount = msg.count;
                     } else {
                         fastify.log.warn(
