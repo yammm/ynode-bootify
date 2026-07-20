@@ -69,7 +69,7 @@
         "ver:preview": "npx autover --no-amend --dry-run --short",
         "ver:apply": "npx autover --guard-unchanged --short",
         "test": "node --test",
-        "prepublishOnly": "npm test && npm run lint",
+        "prepublishOnly": "npm run format:check && npm run lint && npm test && npm run docs",
         "postversion": "git push && git push --tags"
     },
     "publishConfig": {

@@ -3,8 +3,13 @@
  */
 
 import cluster from "node:cluster";
+import os from "node:os";
 
 import { off } from "../events.js";
+
+const WORKER_SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM", "SIGQUIT", "SIGUSR2"].filter((signal) =>
+    Object.hasOwn(os.constants.signals ?? {}, signal),
+);
 
 /**
  * Formats the server's bound address for display in log messages.
@@ -34,6 +39,7 @@ export function resolveListenAddress(server) {
  * @param {object} options.pkg - Package.json content.
  * @param {object} [options.hooks] - Lifecycle hooks (onShutdown).
  * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
+ * @param {object} [options.processTarget] - Process-like target for worker exit (default: signalTarget).
  * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
  * @returns {{ lifecycleContext: object, gracefulShutdown: function(string=): Promise<void>, dispose: function(): void }}
  */
@@ -43,6 +49,7 @@ export function createLifecycleController({
     pkg,
     hooks = {},
     signalTarget = process,
+    processTarget = signalTarget,
     worker = cluster.worker,
 }) {
     const lifecycleContext = { fastify, config, pkg };
@@ -109,14 +116,72 @@ export function createLifecycleController({
         return shutdownPromise;
     };
 
+    const configuredShutdownTimeout = config.cluster?.shutdownTimeout;
+    const shutdownTimeout =
+        Number.isFinite(configuredShutdownTimeout) && configuredShutdownTimeout >= 0
+            ? configuredShutdownTimeout
+            : 10000;
+    let exitAfterShutdown = false;
+    let terminationPromise = null;
+
+    const shutdownWorker = async (signal, { exitAfter = false } = {}) => {
+        exitAfterShutdown ||= exitAfter;
+        if (!terminationPromise) {
+            terminationPromise = (async () => {
+                let shutdownError = null;
+                let timeout = null;
+                try {
+                    const timeoutPromise = new Promise((_, reject) => {
+                        timeout = setTimeout(() => {
+                            reject(
+                                new Error(
+                                    `Worker shutdown after ${signal} exceeded ${shutdownTimeout}ms`,
+                                ),
+                            );
+                        }, shutdownTimeout);
+                        timeout.unref();
+                    });
+                    await Promise.race([gracefulShutdown(signal), timeoutPromise]);
+                } catch (ex) {
+                    shutdownError = ex;
+                    fastify.log.error(ex, `Error during shutdown after ${signal}`);
+                } finally {
+                    if (timeout) {
+                        clearTimeout(timeout);
+                    }
+                }
+
+                if (worker && (typeof worker.isConnected !== "function" || worker.isConnected())) {
+                    try {
+                        worker.disconnect();
+                    } catch (ex) {
+                        shutdownError ??= ex;
+                        fastify.log.error(ex, "Failed to disconnect cluster worker after shutdown");
+                    }
+                }
+
+                if (
+                    (exitAfterShutdown || shutdownError) &&
+                    typeof processTarget.exit === "function"
+                ) {
+                    processTarget.exit(shutdownError ? 1 : 0);
+                } else if (shutdownError && "exitCode" in processTarget) {
+                    processTarget.exitCode = 1;
+                }
+            })();
+        }
+        return terminationPromise;
+    };
+
     const signalHandlers = new Map();
-    for (const signal of ["SIGINT", "SIGTERM", "SIGUSR2"]) {
-        const handler = async () => {
-            try {
-                await gracefulShutdown(signal);
-            } catch (ex) {
-                fastify.log.error(ex, `Error during shutdown after ${signal}`);
+    for (const signal of WORKER_SHUTDOWN_SIGNALS) {
+        const handler = () => {
+            if (terminationPromise && typeof processTarget.exit === "function") {
+                fastify.log.warn(`Received ${signal} again; forcing worker exit.`);
+                processTarget.exit(1);
+                return;
             }
+            void shutdownWorker(signal, { exitAfter: true });
         };
         signalHandlers.set(signal, handler);
         signalTarget.on(signal, handler);
@@ -134,6 +199,15 @@ export function createLifecycleController({
                             { count: msg.count },
                             "Ignoring invalid cluster-count message payload.",
                         );
+                    }
+                    if (Number.isInteger(msg.minWorkers) && msg.minWorkers > 0) {
+                        fastify.clusterMinWorkers = msg.minWorkers;
+                    }
+                    if (Number.isInteger(msg.maxWorkers) && msg.maxWorkers > 0) {
+                        fastify.clusterMaxWorkers = msg.maxWorkers;
+                    }
+                    if (msg.mode === "smart" || msg.mode === "max") {
+                        fastify.clusterMode = msg.mode;
                     }
                     return;
                 }
@@ -154,13 +228,7 @@ export function createLifecycleController({
             }
 
             if (msg === "shutdown") {
-                try {
-                    await gracefulShutdown("shutdown");
-                    worker.disconnect();
-                } catch (ex) {
-                    fastify.log.error(ex, "Error during shutdown command handling");
-                    process.exit(1);
-                }
+                await shutdownWorker("shutdown");
             }
         };
 

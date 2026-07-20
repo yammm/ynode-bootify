@@ -82,6 +82,12 @@ test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
     assert.deepStrictEqual(buildAutoshutdownOptions({ sleep: 45, reportLoad: true }), {
         sleep: 45,
     });
+    assert.deepStrictEqual(
+        buildAutoshutdownOptions({
+            sleep: { sleep: 45, grace: 5, jitter: 0, memoryLimit: 512 },
+        }),
+        { sleep: 45, grace: 5, jitter: 0, memoryLimit: 512 },
+    );
 });
 
 test("createServer enables HTTP/2 server when configured", async () => {

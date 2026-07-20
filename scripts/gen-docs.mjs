@@ -54,9 +54,8 @@ const version = pkg.version ?? "0.0.0";
 const url = (pkg.homepage ?? "").toString();
 
 const outdir = "docs";
-if (!existsSync(outdir)) {
-    mkdirSync(outdir, { recursive: true });
-}
+rmSync(outdir, { recursive: true, force: true });
+mkdirSync(outdir, { recursive: true });
 
 const jsdocConfigPath = resolve(process.cwd(), ".jsdoc.generated.json");
 const jsdoc = {

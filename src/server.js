@@ -25,13 +25,13 @@ import { rewriteUrl } from "./rewrite.js";
  * @returns {object} Normalized autoshutdown options.
  */
 export function buildAutoshutdownOptions(config = {}) {
-    const autoShutdownOptions = {};
-
-    if (config.sleep !== undefined) {
-        autoShutdownOptions.sleep = config.sleep;
+    if (config.sleep === undefined) {
+        return {};
     }
-
-    return autoShutdownOptions;
+    if (config.sleep !== null && typeof config.sleep === "object" && !Array.isArray(config.sleep)) {
+        return { ...config.sleep };
+    }
+    return { sleep: config.sleep };
 }
 
 /**
@@ -41,12 +41,16 @@ export function buildAutoshutdownOptions(config = {}) {
  * @returns {Promise<Fastify.FastifyInstance>} A configured Fastify instance.
  */
 export async function createServer(config, log) {
+    const loggingOptions =
+        typeof Fastify.LogController === "function"
+            ? { logController: new Fastify.LogController({ disableRequestLogging: true }) }
+            : { disableRequestLogging: true };
     const fastify = Fastify({
         loggerInstance: log,
         trustProxy: config.trustProxy ?? false,
         http2: !!config.http2,
         forceCloseConnections: config.http2 ? false : "idle",
-        disableRequestLogging: true,
+        ...loggingOptions,
         rewriteUrl: (req) => rewriteUrl(req, config),
     });
 

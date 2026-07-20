@@ -96,6 +96,7 @@ function validateHooks(hooks) {
  * @param {function} options.app - Function returning Promise<{default: plugin}>.
  * @param {object} options.config - The configuration object (argv).
  * @param {object} [options.pkg] - Optional package.json object, default is to load from `${process.cwd()}/package.json`.
+ * @param {object} [options.tty] - Backward-compatible top-level Cluster TTY options.
  * @param {function} [options.validator] - Optional function to validate `config` before starting.
  * @param {object} [options.hooks] - Optional lifecycle hooks.
  * @param {object} [options._internal] - Internal test hooks.
@@ -143,15 +144,21 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
     }
     setBootifyStateFn("starting");
 
-    const sigquitHandler = () => {
-        if (typeof processTarget.abort === "function") {
-            processTarget.abort();
-            return;
-        }
-        process.abort();
-    };
     let exitHandler = null;
     let sighupHandler = null;
+    let handlersRemoved = false;
+    const removeProcessHandlers = () => {
+        if (handlersRemoved) {
+            return;
+        }
+        handlersRemoved = true;
+        if (exitHandler) {
+            off(processTarget, "exit", exitHandler);
+        }
+        if (sighupHandler) {
+            off(processTarget, "SIGHUP", sighupHandler);
+        }
+    };
 
     try {
         if (validator) {
@@ -165,9 +172,6 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
 
         // logging
         const log = ylogFn(import.meta, { pid: true });
-
-        // terminate with core dump
-        processTarget.on("SIGQUIT", sigquitHandler);
 
         // bye bye
         exitHandler = (code) => {
@@ -210,17 +214,19 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
             processTarget.on("SIGHUP", sighupHandler);
         }
 
+        if (manager && typeof manager.close === "function") {
+            const closeManager = manager.close.bind(manager);
+            manager.close = async (...args) => {
+                removeProcessHandlers();
+                return closeManager(...args);
+            };
+        }
+
         setBootifyStateFn("started");
         return manager;
     } catch (ex) {
         setBootifyStateFn("idle");
-        off(processTarget, "SIGQUIT", sigquitHandler);
-        if (exitHandler) {
-            off(processTarget, "exit", exitHandler);
-        }
-        if (sighupHandler) {
-            off(processTarget, "SIGHUP", sighupHandler);
-        }
+        removeProcessHandlers();
         throw ex;
     }
 }

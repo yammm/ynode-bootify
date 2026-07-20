@@ -55,6 +55,9 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
 
     // add cluster count to fastify instance
     fastify.decorate("clusterCount", 1);
+    fastify.decorate("clusterMinWorkers", 1);
+    fastify.decorate("clusterMaxWorkers", 1);
+    fastify.decorate("clusterMode", "smart");
 
     const lifecycleContext = { fastify, config, pkg };
     let gracefulShutdown = null;

@@ -11,7 +11,7 @@ A Fastify bootstrap plugin that incorporates standardized @ynode patterns for cl
 `@ynode/bootify` eliminates the boilerplate code typically found in the entry points of `@ynode` applications. It consolidates:
 
 - **Cluster Management**: Automatically handles master/worker process forks using `@ynode/cluster`.
-- **Signal Handling**: Manages graceful shutdowns (`SIGINT`, `SIGTERM`, `SIGUSR2`), zero-downtime reloads (`SIGHUP`), and keeps `SIGQUIT` mapped to `process.abort()` for core dumps.
+- **Signal Handling**: Manages supported graceful shutdown signals (`SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGUSR2`) and zero-downtime reloads (`SIGHUP`) without competing with the cluster primary.
 - **Fastify Initialization**: Creates the server instance with standard configurations (like `proxiable` and `autoshutdown`).
 
 ## Installation
@@ -64,11 +64,13 @@ The `config` object is typically the resolved output of `yargs`. It supports the
 - `http2`: Enable HTTP/2 support (boolean).
 - `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.
 - `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be strings. Non-string values are ignored.
-- `sleep`: Options for `@ynode/autoshutdown`.
+- `sleep`: An inactivity period in seconds or a complete `@ynode/autoshutdown` options object such as `{ sleep: 1800, grace: 30, jitter: 5 }`.
 - `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to `{ retries: 5, delay: 15000 }`.
 
 With `@ynode/cluster` `1.4.0+`, you can configure TTY command mode and reload commands via `cluster.tty`. Starting with `@ynode/cluster` `1.8.0+`, `@ynode/bootify` automatically intercepts and responds to the built-in telemetry queries (`/status`, `/ping`, `/version`) without any additional boilerplate.
+
+The older top-level `tty` option remains supported for compatibility, but new applications should use `config.cluster.tty`.
 
 For example:
 
@@ -82,6 +84,8 @@ cluster: {
   }
 }
 ```
+
+Workers also expose the current pool metadata as Fastify decorations: `clusterCount` (active workers), `clusterMinWorkers`, `clusterMaxWorkers`, and `clusterMode`. Cluster count broadcasts include these values after worker, scale, reload, and retirement transitions.
 
 ### Production Configuration Example
 
@@ -118,6 +122,7 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 | `pkg` | `Object` | Optional parsed content of `package.json` (auto-loaded from `process.cwd()` when omitted). |
 | `validator` | `Function` | Optional function to validate `config` before starting. |
 | `hooks` | `Object` | Optional lifecycle hooks: `onBeforeListen`, `onAfterListen`, and `onShutdown`. |
+| `tty` | `Object` | Backward-compatible top-level Cluster TTY options; prefer `config.cluster.tty`. |
 
 #### Hook Contexts
 
@@ -135,6 +140,14 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 - `BootifyManager.getMetrics()` for cluster worker/load metrics.
 - `BootifyManager.close(): Promise<void>` for programmatic cluster shutdown.
 - `BootifyManager.on/once/off(...)` for cluster lifecycle events.
+
+### Signal and Shutdown Semantics
+
+In clustered mode, `@ynode/cluster` is the sole primary-process owner of supported `SIGINT`, `SIGTERM`, and `SIGQUIT` signals. Bootify workers close Fastify, run `onShutdown`, disconnect from the primary, and exit. A worker shutdown that exceeds `config.cluster.shutdownTimeout` exits non-zero so the primary can complete its bounded escalation.
+
+`SIGQUIT` now performs graceful shutdown. Applications that need a core dump should invoke `process.abort()` explicitly from an operationally controlled path rather than installing a second handler for the same signal.
+
+Calling `BootifyManager.close()` also removes Bootify's process-level `SIGHUP` and exit listeners, preventing reload requests after programmatic shutdown has begun.
 
 #### Startup Semantics
 

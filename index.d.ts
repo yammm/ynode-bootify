@@ -2,6 +2,15 @@
  * Type definitions for @ynode/bootify
  */
 
+import type { AutoshutdownOptions } from "@ynode/autoshutdown";
+import type {
+    ClusterEvent,
+    ClusterEventName,
+    ClusterManager,
+    ClusterMetrics,
+    ClusterOptions,
+    ClusterTtyOptions,
+} from "@ynode/cluster";
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 type AppModule = { default: FastifyPluginAsync };
@@ -23,19 +32,9 @@ export interface ListenRetryOptions {
     delay?: number;
 }
 
-export interface BootifyClusterTtyOptions {
-    enabled?: boolean;
-    commands?: boolean;
-    reloadCommand?: string;
-    stdin?: NodeJS.ReadStream;
-    stdout?: NodeJS.WriteStream;
-    prompt?: string;
-}
+export interface BootifyClusterTtyOptions extends ClusterTtyOptions {}
 
-export interface BootifyClusterOptions extends Record<string, any> {
-    enabled?: boolean;
-    tty?: BootifyClusterTtyOptions;
-}
+export interface BootifyClusterOptions extends ClusterOptions {}
 
 export interface BootifyConfig extends Record<string, any> {
     cluster?: boolean | BootifyClusterOptions;
@@ -43,7 +42,7 @@ export interface BootifyConfig extends Record<string, any> {
     http2?: boolean;
     trustProxy?: boolean | string | number | Record<string, any>;
     rewrite?: Record<string, string>;
-    sleep?: number | Record<string, any>;
+    sleep?: number | AutoshutdownOptions;
     listen?: string | number | ListenOptions;
     listenRetry?: ListenRetryOptions;
 }
@@ -86,6 +85,11 @@ export interface BootOptions {
     pkg?: Record<string, any>;
 
     /**
+     * Backward-compatible top-level Cluster TTY configuration. Prefer config.cluster.tty.
+     */
+    tty?: BootifyClusterTtyOptions;
+
+    /**
      * Optional validation function for configuration.
      */
     validator?: (config: BootifyConfig) => Promise<void> | void;
@@ -96,52 +100,20 @@ export interface BootOptions {
     hooks?: BootifyHooks;
 }
 
-export interface BootifyClusterMetrics {
-    workers: Array<Record<string, any>>;
-    totalLag: number;
-    avgLag: number;
-    workerCount: number;
-    maxWorkers: number;
-    minWorkers: number;
-    scaleUpThreshold: number;
-    scaleDownThreshold: number;
-    mode: "smart" | "max";
-}
+export type BootifyClusterMetrics = ClusterMetrics;
+export type BootifyClusterEventName = ClusterEventName;
+export type BootifyClusterEvent = ClusterEvent;
+export type BootifyManager = ClusterManager;
 
-export type BootifyClusterEventName =
-    | "worker_online"
-    | "worker_exit"
-    | "worker_restart_scheduled"
-    | "worker_listening"
-    | "scale_up"
-    | "scale_down"
-    | "reload_start"
-    | "reload_end"
-    | "reload_fail"
-    | "shutdown_start"
-    | "shutdown_end";
-
-export interface BootifyClusterEvent {
-    type: BootifyClusterEventName;
-    [key: string]: unknown;
-}
-
-export interface BootifyManager {
-    getMetrics: () => BootifyClusterMetrics;
-    reload: () => Promise<void>;
-    close: () => Promise<void>;
-    on: (
-        eventName: BootifyClusterEventName,
-        listener: (event: BootifyClusterEvent) => void,
-    ) => BootifyManager;
-    once: (
-        eventName: BootifyClusterEventName,
-        listener: (event: BootifyClusterEvent) => void,
-    ) => BootifyManager;
-    off: (
-        eventName: BootifyClusterEventName,
-        listener: (event: BootifyClusterEvent) => void,
-    ) => BootifyManager;
+declare module "fastify" {
+    interface FastifyInstance {
+        config: BootifyConfig;
+        pkg: Record<string, any>;
+        clusterCount: number;
+        clusterMinWorkers: number;
+        clusterMaxWorkers: number;
+        clusterMode: "smart" | "max";
+    }
 }
 
 export type BootifyResult = void | BootifyManager;

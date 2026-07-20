@@ -95,12 +95,14 @@ test("createLifecycleController dispose removes signal listeners", () => {
 
     assert.strictEqual(signalTarget.listenerCount("SIGINT"), 1);
     assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 1);
+    assert.strictEqual(signalTarget.listenerCount("SIGQUIT"), 1);
     assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 1);
 
     controller.dispose();
 
     assert.strictEqual(signalTarget.listenerCount("SIGINT"), 0);
     assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
+    assert.strictEqual(signalTarget.listenerCount("SIGQUIT"), 0);
     assert.strictEqual(signalTarget.listenerCount("SIGUSR2"), 0);
 });
 
@@ -194,5 +196,65 @@ test("createLifecycleController ignores invalid cluster-count payloads", async (
     worker.emit("message", { cmd: "cluster-count", count: 4 });
     assert.strictEqual(fastify.clusterCount, 4);
 
+    controller.dispose();
+});
+
+test("direct worker signals close, disconnect, and exit cleanly", async () => {
+    const processTarget = new EventEmitter();
+    const exitCodes = [];
+    processTarget.exit = (code) => exitCodes.push(code);
+    const worker = new EventEmitter();
+    worker.isConnected = () => true;
+    let disconnectCalls = 0;
+    worker.disconnect = () => {
+        disconnectCalls += 1;
+    };
+    const fastify = createFastifyDouble();
+
+    const controller = createLifecycleController({
+        fastify,
+        config: { cluster: { shutdownTimeout: 100 } },
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget: processTarget,
+        processTarget,
+        worker,
+    });
+
+    processTarget.emit("SIGQUIT");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.strictEqual(fastify.closeCalls, 1);
+    assert.strictEqual(disconnectCalls, 1);
+    assert.deepStrictEqual(exitCodes, [0]);
+    controller.dispose();
+});
+
+test("worker shutdown timeout disconnects and exits non-zero", async () => {
+    const processTarget = new EventEmitter();
+    const exitCodes = [];
+    processTarget.exit = (code) => exitCodes.push(code);
+    const worker = new EventEmitter();
+    worker.isConnected = () => true;
+    let disconnectCalls = 0;
+    worker.disconnect = () => {
+        disconnectCalls += 1;
+    };
+    const fastify = createFastifyDouble();
+
+    const controller = createLifecycleController({
+        fastify,
+        config: { cluster: { shutdownTimeout: 10 } },
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: { onShutdown: () => new Promise(() => {}) },
+        signalTarget: processTarget,
+        processTarget,
+        worker,
+    });
+
+    worker.emit("message", "shutdown");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.strictEqual(disconnectCalls, 1);
+    assert.deepStrictEqual(exitCodes, [1]);
     controller.dispose();
 });
