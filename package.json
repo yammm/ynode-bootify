@@ -1,6 +1,6 @@
 {
     "name": "@ynode/bootify",
-    "version": "1.14.0+290558",
+    "version": "1.14.0+290606",
     "description": "A standardized Fastify application bootstrapper with built-in cluster management, graceful shutdown, and configuration wiring for the @ynode ecosystem.",
     "main": "src/plugin.js",
     "types": "index.d.ts",
@@ -53,7 +53,7 @@
         "fastify": "^5.10.0",
         "globals": "^17.7.0",
         "jsdoc": "^4.0.5",
-        "prettier": "^3.9.5",
+        "prettier": "^3.9.6",
         "rimraf": "^6.1.3",
         "yargs": "^18.0.0"
     },
@@ -82,9 +82,9 @@
         "LICENSE"
     ],
     "dependencies": {
-        "@ynode/autoshutdown": "^1.8.0",
-        "@ynode/cluster": "^1.11.0",
-        "@ynode/ylog": "^1.5.0",
+        "@ynode/autoshutdown": "^1.9.0",
+        "@ynode/cluster": "^1.12.0",
+        "@ynode/ylog": "^1.7.0",
         "mkpidfile": "^1.0.1",
         "proxiable": "^1.0.4"
     },
