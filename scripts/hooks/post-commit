@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# >>> autover managed block >>>
+if command -v npx >/dev/null 2>&1; then
+    npx --no-install autover
+else
+    echo "⚠️ npx not found. Install Node.js/npm to use autover."
+fi
+# <<< autover managed block <<<
