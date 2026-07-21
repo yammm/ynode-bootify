@@ -74,7 +74,7 @@ export default defineConfig([
                 {
                     groups: [
                         ["^\\u0000"],
-                        [`^node:`, `^(${builtinModules.join("|")})(/|$)`],
+                        [`^node:(?!test$)`, `^node:test$`, `^(${builtinModules.join("|")})(/|$)`],
                         ["^@?\\w"],
                         ["^.*core(/|$)"],
                         ["^\\."],
@@ -114,7 +114,7 @@ export default defineConfig([
                 {
                     groups: [
                         ["^\\u0000"],
-                        [`^node:`, `^(${builtinModules.join("|")})(/|$)`],
+                        [`^node:(?!test$)`, `^node:test$`, `^(${builtinModules.join("|")})(/|$)`],
                         ["^@?\\w"],
                         ["^.*core(/|$)"],
                         ["^\\."],
