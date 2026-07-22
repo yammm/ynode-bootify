@@ -155,6 +155,8 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 
 In clustered mode, `@ynode/cluster` is the sole primary-process owner of supported `SIGINT`, `SIGTERM`, and `SIGQUIT` signals. Bootify workers run `onShutdown` exactly once, close Fastify, disconnect from the primary, and exit. Idle Autoshutdown uses Node's voluntary worker disconnect semantics, allowing a smart pool to shrink without being treated as a crash. A worker shutdown that exceeds `config.cluster.shutdownTimeout` exits non-zero so the primary can complete its bounded escalation.
 
+Cluster-initiated worker retirement, including zero-downtime reload, closes all HTTP connections before Fastify enters closing state so clients reconnect to a healthy replacement worker instead of reusing a retiring worker that may return 5xx responses. Direct OS-signal shutdowns use the gentler idle-connection drain path so active responses can complete when the whole service is stopping.
+
 `SIGQUIT` now performs graceful shutdown. Applications that need a core dump should invoke `process.abort()` explicitly from an operationally controlled path rather than installing a second handler for the same signal.
 
 Calling `BootifyManager.close()` also removes Bootify's process-level `SIGHUP` and exit listeners, preventing reload requests after programmatic shutdown has begun.

@@ -78,21 +78,34 @@ export function createLifecycleController({
         beginShutdown();
         if (!shutdownPromise) {
             shutdownPromise = (async () => {
+                const closeActiveConnections = signal === "shutdown";
                 // Drop out of the cluster master's round-robin pool and
-                // evict idle keep-alive connections before Fastify
+                // evict client connections before Fastify
                 // flips into closing-state. fastify.close() does these
                 // eventually, but only after preClose hooks (Mongoose,
                 // Redis, etc.) finish — and during that window the router
                 // rejects every keep-alive request with 503. Doing it up
-                // front means idle clients reconnect cleanly to a healthy
-                // worker while active responses finish draining.
+                // front means clients reconnect cleanly to a healthy worker
+                // while OS-signal shutdowns can still drain active responses.
                 if (fastify.server?.listening) {
                     try {
                         fastify.server.close();
                     } catch (ex) {
                         fastify.log.warn({ err: ex }, "Pre-shutdown server.close() failed");
                     }
-                    if (typeof fastify.server.closeIdleConnections === "function") {
+                    if (
+                        closeActiveConnections &&
+                        typeof fastify.server.closeAllConnections === "function"
+                    ) {
+                        try {
+                            fastify.server.closeAllConnections();
+                        } catch (ex) {
+                            fastify.log.warn(
+                                { err: ex },
+                                "Pre-shutdown closeAllConnections() failed",
+                            );
+                        }
+                    } else if (typeof fastify.server.closeIdleConnections === "function") {
                         try {
                             fastify.server.closeIdleConnections();
                         } catch (ex) {

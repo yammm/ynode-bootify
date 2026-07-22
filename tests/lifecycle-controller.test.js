@@ -347,6 +347,37 @@ test("graceful shutdown evicts idle connections without aborting active connecti
     controller.dispose();
 });
 
+test("cluster retirement evicts active connections before Fastify closing state", async () => {
+    const connectionCalls = [];
+    const fastify = createFastifyDouble();
+    fastify.server = {
+        listening: true,
+        close() {
+            connectionCalls.push("close");
+        },
+        closeIdleConnections() {
+            connectionCalls.push("close-idle");
+        },
+        closeAllConnections() {
+            connectionCalls.push("close-all");
+        },
+    };
+
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget: new EventEmitter(),
+        worker: null,
+    });
+
+    await controller.gracefulShutdown("shutdown");
+
+    assert.deepStrictEqual(connectionCalls, ["close", "close-all"]);
+    assert.strictEqual(fastify.closeCalls, 1);
+    controller.dispose();
+});
+
 test("first OS signal joins an IPC-initiated drain instead of forcing exit", async () => {
     const signalTarget = new EventEmitter();
     const exitCodes = [];
