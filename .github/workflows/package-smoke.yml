@@ -1,0 +1,81 @@
+name: package-smoke
+
+on:
+    pull_request:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: package-smoke-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    pack:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: "22.12.0"
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Pack and install tarball
+              shell: bash
+              run: |
+                  npm pack --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/pack.json"
+                  node --input-type=module <<'NODE'
+                  import { readFileSync, writeFileSync } from "node:fs";
+
+                  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+                  const specifiers = new Set();
+                  if (pkg.exports || pkg.main || pkg.module) {
+                      specifiers.add(pkg.name);
+                  }
+                  if (pkg.exports && typeof pkg.exports === "object" && !Array.isArray(pkg.exports)) {
+                      for (const key of Object.keys(pkg.exports)) {
+                          if (key === "." || key === "./package.json" || !key.startsWith("./") || key.includes("*")) {
+                              continue;
+                          }
+                          specifiers.add(`${pkg.name}/${key.slice(2)}`);
+                      }
+                  }
+                  const bins = typeof pkg.bin === "string" ? [pkg.name] : Object.keys(pkg.bin ?? {});
+                  writeFileSync(`${process.env.RUNNER_TEMP}/smoke.json`, JSON.stringify({ bins, specifiers: [...specifiers] }));
+                  NODE
+
+                  tarball="$(node -e 'const fs = require("node:fs"); const [pack] = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); console.log(pack.filename);' "$RUNNER_TEMP/pack.json")"
+                  smoke_dir="$RUNNER_TEMP/package-smoke"
+                  mkdir "$smoke_dir"
+                  cd "$smoke_dir"
+                  npm init -y >/dev/null
+                  npm install "$RUNNER_TEMP/$tarball" >/dev/null
+                  node --input-type=module <<'NODE'
+                  import { readFileSync } from "node:fs";
+                  import { spawnSync } from "node:child_process";
+
+                  const { bins, specifiers } = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/smoke.json`, "utf8"));
+                  for (const specifier of specifiers) {
+                      await import(specifier);
+                  }
+                  for (const bin of bins) {
+                      const result = spawnSync("npx", ["--no-install", bin, "--help"], {
+                          encoding: "utf8",
+                      });
+                      if (result.status !== 0) {
+                          console.error(result.stdout);
+                          console.error(result.stderr);
+                          throw new Error(`Bin smoke failed: ${bin}`);
+                      }
+                  }
+                  NODE
