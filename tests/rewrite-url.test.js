@@ -23,10 +23,10 @@ test("rewriteUrl ignores inherited rewrite keys", () => {
     assert.strictEqual(result, "/foo?a=1");
 });
 
-test("rewriteUrl supports own empty-string rewrite targets", () => {
+test("rewriteUrl defensively ignores unusable rewrite targets", () => {
     const result = rewriteUrl({ url: "/foo?a=1" }, { rewrite: { "/foo": "" } });
 
-    assert.strictEqual(result, "?a=1");
+    assert.strictEqual(result, "/foo?a=1");
 });
 
 test("rewriteUrl ignores non-string rewrite targets", () => {
@@ -53,11 +53,11 @@ test("rewriteUrl merges duplicate query keys from target and request", () => {
     assert.strictEqual(result, "/b?x=1&x=2&y=3");
 });
 
-test("assertRewriteConfig accepts missing, empty, and string-valued maps", () => {
+test("assertRewriteConfig accepts missing, empty, and internal absolute-path maps", () => {
     assert.doesNotThrow(() => assertRewriteConfig(undefined));
     assert.doesNotThrow(() => assertRewriteConfig({}));
     assert.doesNotThrow(() => assertRewriteConfig({ rewrite: {} }));
-    assert.doesNotThrow(() => assertRewriteConfig({ rewrite: { "/a": "/b", "/c": "" } }));
+    assert.doesNotThrow(() => assertRewriteConfig({ rewrite: { "/a": "/b", "/c": "/" } }));
 });
 
 test("assertRewriteConfig rejects non-object rewrite maps", () => {
@@ -76,4 +76,20 @@ test("assertRewriteConfig rejects non-string rewrite targets", () => {
         name: "TypeError",
         message: /Invalid "config\.rewrite" target for "\/a"/,
     });
+});
+
+test("assertRewriteConfig rejects unusable rewrite targets", () => {
+    for (const target of [
+        "",
+        "relative",
+        "https://example.test/x",
+        "//example.test/x",
+        "/a b",
+        "/a#part",
+    ]) {
+        assert.throws(() => assertRewriteConfig({ rewrite: { "/a": target } }), {
+            name: "TypeError",
+            message: /Expected a non-empty absolute internal path/,
+        });
+    }
 });

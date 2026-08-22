@@ -122,6 +122,34 @@ test("buildAutoshutdownOptions rejects Cluster-owned and unsupported settings", 
     );
 });
 
+test("buildAutoshutdownOptions validates object-form settings before worker startup", () => {
+    for (const [name, value] of [
+        ["sleep", -1],
+        ["grace", "soon"],
+        ["jitter", -1],
+        ["force", "yes"],
+        ["ignoreUrls", [42]],
+        ["ignore", {}],
+        ["hookTimeout", -1],
+        ["closeTimeout", 0],
+        ["onShutdownStart", true],
+        ["onShutdownComplete", "later"],
+    ]) {
+        assert.throws(
+            () => buildAutoshutdownOptions({ sleep: { sleep: 45, [name]: value } }),
+            new RegExp(`config\\.sleep\\.${name}`),
+        );
+    }
+
+    assert.throws(
+        () =>
+            buildAutoshutdownOptions({
+                sleep: { sleep: 2 ** 31 / 1000, jitter: 1 },
+            }),
+        /Combined sleep and jitter exceed Node\.js timer limits/,
+    );
+});
+
 test("createServer enables HTTP/2 server when configured", async () => {
     await withWorkerFlag(false, async () => {
         const fastify = await createServer({ http2: true }, createLogStub());

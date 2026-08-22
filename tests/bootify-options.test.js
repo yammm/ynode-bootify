@@ -113,6 +113,53 @@ test("bootify rejects non-string rewrite targets before forking workers", async 
     assert.strictEqual(runCalls, 0);
 });
 
+test("bootify rejects unusable rewrite targets before forking workers", async () => {
+    for (const target of ["", "relative", "https://example.test/x"]) {
+        let runCalls = 0;
+        await expectTypeError(
+            () =>
+                bootify({
+                    app: async () => async () => {},
+                    config: { rewrite: { "/a": target } },
+                    pkg: {},
+                    _internal: {
+                        run: async () => {
+                            runCalls += 1;
+                        },
+                    },
+                }),
+            /Invalid "config\.rewrite" target for "\/a"/,
+        );
+        assert.strictEqual(runCalls, 0);
+    }
+});
+
+test("bootify validates object-form sleep settings before forking workers", async () => {
+    for (const [name, value] of [
+        ["sleep", -1],
+        ["grace", "soon"],
+        ["force", "yes"],
+        ["ignoreUrls", [42]],
+    ]) {
+        let runCalls = 0;
+        await expectTypeError(
+            () =>
+                bootify({
+                    app: async () => async () => {},
+                    config: { sleep: { sleep: 45, [name]: value } },
+                    pkg: {},
+                    _internal: {
+                        run: async () => {
+                            runCalls += 1;
+                        },
+                    },
+                }),
+            new RegExp(`config\\.sleep\\.${name}`),
+        );
+        assert.strictEqual(runCalls, 0);
+    }
+});
+
 test("bootify rejects null cluster configuration instead of enabling clustering", async () => {
     let runCalls = 0;
 

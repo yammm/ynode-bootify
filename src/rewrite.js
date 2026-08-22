@@ -5,8 +5,23 @@
  */
 
 /**
+ * Tests whether a rewrite target is a usable internal absolute path.
+ * @param {*} target - Candidate target.
+ * @returns {boolean}
+ */
+function isUsableRewriteTarget(target) {
+    return (
+        typeof target === "string" &&
+        target.startsWith("/") &&
+        !target.startsWith("//") &&
+        !/[\s#]/u.test(target)
+    );
+}
+
+/**
  * Validates the rewrite map at the configuration boundary.
- * Ensures every rewrite target is a string before requests reach rewriteUrl().
+ * Ensures every rewrite target is a usable internal absolute path before
+ * requests reach rewriteUrl().
  * @param {object} [config] - The configuration object.
  * @returns {void}
  */
@@ -23,9 +38,9 @@ export function assertRewriteConfig(config) {
     }
 
     for (const [path, target] of Object.entries(rewrite)) {
-        if (typeof target !== "string") {
+        if (!isUsableRewriteTarget(target)) {
             throw new TypeError(
-                `Invalid "config.rewrite" target for "${path}". Expected a string.`,
+                `Invalid "config.rewrite" target for "${path}". Expected a non-empty absolute internal path without whitespace or a fragment.`,
             );
         }
     }
@@ -50,7 +65,7 @@ export function rewriteUrl(req, config) {
     const [pathname, ...queryParts] = req.url.split("?");
     const requestQuery = queryParts.join("?");
 
-    if (!Object.hasOwn(rewrite, pathname) || typeof rewrite[pathname] !== "string") {
+    if (!Object.hasOwn(rewrite, pathname) || !isUsableRewriteTarget(rewrite[pathname])) {
         return req.url;
     }
 

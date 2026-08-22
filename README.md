@@ -66,7 +66,7 @@ The `config` object is typically the resolved output of `yargs`. It supports the
 - `pidfile`: Path to write the PID file (optional).
 - `http2`: Enable HTTP/2 support (boolean).
 - `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.
-- `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be strings; non-string values are rejected at startup. When a rewrite target carries its own query string, the request's query string is merged into it (`{"/a": "/b?x=1"}` + `/a?y=2` → `/b?x=1&y=2`).
+- `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be non-empty absolute internal paths; malformed, external, relative, whitespace-containing, and fragment targets are rejected at startup. When a rewrite target carries its own query string, the request's query string is merged into it (`{"/a": "/b?x=1"}` + `/a?y=2` → `/b?x=1&y=2`).
 - `sleep`: An inactivity period in seconds or an idle-only `@ynode/autoshutdown` options object such as `{ sleep: 1800, grace: 30, jitter: 5, closeTimeout: 10000 }`. Idle shutdown only applies to cluster workers; with `cluster: false` the option is validated but has no effect, and Bootify logs a warning at startup.
 - `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to `{ retries: 5, delay: 15000 }`.
