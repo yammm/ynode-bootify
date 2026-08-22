@@ -67,7 +67,7 @@ The `config` object is typically the resolved output of `yargs`. It supports the
 - `http2`: Enable HTTP/2 support (boolean).
 - `trustProxy`: Forwarded/real client IP trust setting passed directly to Fastify `trustProxy`.
 - `rewrite`: An object map for URL rewriting. Keys are exact request paths and values must be strings. Non-string values are ignored.
-- `sleep`: An inactivity period in seconds or an idle-only `@ynode/autoshutdown` options object such as `{ sleep: 1800, grace: 30, jitter: 5, closeTimeout: 10000 }`.
+- `sleep`: An inactivity period in seconds or an idle-only `@ynode/autoshutdown` options object such as `{ sleep: 1800, grace: 30, jitter: 5, closeTimeout: 10000 }`. Idle shutdown only applies to cluster workers; with `cluster: false` the option is validated but has no effect, and Bootify logs a warning at startup.
 - `listen`: The binding address can be a number (`3000`), a string (e.g., `"3000"`, `"127.0.0.1:8080"`, `"[::1]:8080"`), or a Unix socket path string. You can also pass an object like `{ port: 3000, host: "0.0.0.0" }` or `{ path: "/tmp/app.sock" }`.
 - `listenRetry`: Optional startup retry policy `{ retries?: number, delay?: number }`. Defaults to `{ retries: 5, delay: 15000 }`.
 

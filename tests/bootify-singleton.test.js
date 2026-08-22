@@ -222,6 +222,55 @@ test("bootify skips SIGHUP wiring when manager reload is not a function", async 
     assert.strictEqual(processTarget.listenerCount("SIGHUP"), 0);
 });
 
+test("bootify warns when sleep is configured without clustering", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    const warnLogs = [];
+    const log = createLogStub();
+    log.warn = (...args) => {
+        warnLogs.push(args);
+    };
+
+    await bootify({
+        app: async () => async () => {},
+        config: { cluster: false, sleep: 1800 },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => log,
+            ...bootifyState,
+            run: async () => ({}),
+        },
+    });
+
+    assert.strictEqual(warnLogs.length, 1);
+    assert.match(warnLogs[0][0], /"config\.sleep" option has no effect/);
+});
+
+test("bootify does not warn about sleep when clustering is enabled", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    const warnLogs = [];
+    const log = createLogStub();
+    log.warn = (...args) => {
+        warnLogs.push(args);
+    };
+
+    await bootify({
+        app: async () => async () => {},
+        config: { cluster: true, sleep: 1800 },
+        pkg: { name: "test", version: "1.0.0" },
+        _internal: {
+            process: processTarget,
+            ylog: () => log,
+            ...bootifyState,
+            run: async () => ({}),
+        },
+    });
+
+    assert.strictEqual(warnLogs.length, 0);
+});
+
 test("bootify catches and logs SIGHUP-triggered reload failures", async () => {
     const processTarget = new EventEmitter();
     const bootifyState = createBootifyState();

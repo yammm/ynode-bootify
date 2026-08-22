@@ -196,6 +196,13 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
         // logging
         const log = ylogFn(import.meta, { pid: true });
 
+        // Autoshutdown only registers in cluster workers, so idle shutdown
+        // never runs in single-process mode. Warn instead of silently
+        // validating and ignoring the option.
+        if (config.sleep !== undefined && runOptions.enabled === false) {
+            log.warn('The "config.sleep" option has no effect when clustering is disabled.');
+        }
+
         // bye bye
         exitHandler = (code) => {
             log.info(`Sayonara. Exit code: ${code}`);
