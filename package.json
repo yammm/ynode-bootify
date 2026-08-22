@@ -1,6 +1,6 @@
 {
     "name": "@ynode/bootify",
-    "version": "1.16.0+336707",
+    "version": "1.16.0+336752",
     "description": "A standardized Fastify application bootstrapper with built-in cluster management, graceful shutdown, and configuration wiring for the @ynode ecosystem.",
     "main": "src/plugin.js",
     "types": "index.d.ts",
@@ -46,15 +46,15 @@
         "@eslint/markdown": "^8.0.3",
         "@mikinho/autover": "^3.1.1",
         "auto-changelog": "^2.6.0",
-        "eslint": "^10.7.0",
+        "eslint": "^10.9.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-simple-import-sort": "^14.0.0",
-        "fastify": "^5.10.0",
-        "globals": "^17.7.0",
+        "fastify": "^5.12.1",
+        "globals": "^17.11.0",
         "jsdoc": "^4.0.5",
         "prettier": "^3.9.6",
         "rimraf": "^6.1.3",
-        "yargs": "^18.0.0"
+        "yargs": "^18.1.0"
     },
     "scripts": {
         "changelog": "auto-changelog -p",
