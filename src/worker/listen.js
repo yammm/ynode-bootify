@@ -23,17 +23,9 @@ function parsePort(port) {
  * @returns {boolean}
  */
 function isSocketPath(value) {
-    return (
-        value.startsWith("/") ||
-        value.startsWith("./") ||
-        value.startsWith("../") ||
-        value.startsWith(".\\") ||
-        value.startsWith("..\\") ||
-        value.startsWith("\\\\") ||
-        /^[A-Za-z]:[\\/]/.test(value) ||
-        value.includes("/") ||
-        value.includes("\\")
-    );
+    // Any path separator marks the value as a socket/pipe path — covering
+    // absolute, relative, UNC, and drive-letter forms alike.
+    return value.includes("/") || value.includes("\\");
 }
 
 /**
