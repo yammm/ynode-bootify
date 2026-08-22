@@ -316,6 +316,95 @@ test("worker shutdown timeout disconnects and exits non-zero", async () => {
     controller.dispose();
 });
 
+test("worker shutdown survives a throwing log.error without unhandled rejection", async () => {
+    const processTarget = new EventEmitter();
+    const exitCodes = [];
+    processTarget.exit = (code) => exitCodes.push(code);
+    const worker = new EventEmitter();
+    worker.isConnected = () => true;
+    let disconnectCalls = 0;
+    worker.disconnect = () => {
+        disconnectCalls += 1;
+    };
+    const fastify = createFastifyDouble();
+    fastify.log.error = () => {
+        throw new Error("logger failed");
+    };
+
+    const unhandledRejections = [];
+    const onUnhandledRejection = (reason) => {
+        unhandledRejections.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    const controller = createLifecycleController({
+        fastify,
+        config: { cluster: { shutdownTimeout: 100 } },
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onShutdown: () => {
+                throw new Error("hook-failed");
+            },
+        },
+        signalTarget: processTarget,
+        processTarget,
+        worker,
+    });
+
+    try {
+        worker.emit("message", "shutdown");
+        await new Promise((resolve) => setTimeout(resolve, 30));
+    } finally {
+        process.off("unhandledRejection", onUnhandledRejection);
+    }
+
+    assert.strictEqual(unhandledRejections.length, 0);
+    assert.strictEqual(disconnectCalls, 1);
+    assert.deepStrictEqual(exitCodes, [1]);
+    controller.dispose();
+});
+
+test("worker shutdown survives a throwing log.error when disconnect fails", async () => {
+    const processTarget = new EventEmitter();
+    const exitCodes = [];
+    processTarget.exit = (code) => exitCodes.push(code);
+    const worker = new EventEmitter();
+    worker.isConnected = () => true;
+    worker.disconnect = () => {
+        throw new Error("disconnect failed");
+    };
+    const fastify = createFastifyDouble();
+    fastify.log.error = () => {
+        throw new Error("logger failed");
+    };
+
+    const unhandledRejections = [];
+    const onUnhandledRejection = (reason) => {
+        unhandledRejections.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    const controller = createLifecycleController({
+        fastify,
+        config: { cluster: { shutdownTimeout: 100 } },
+        pkg: { name: "test", version: "1.0.0" },
+        signalTarget: processTarget,
+        processTarget,
+        worker,
+    });
+
+    try {
+        worker.emit("message", "shutdown");
+        await new Promise((resolve) => setTimeout(resolve, 30));
+    } finally {
+        process.off("unhandledRejection", onUnhandledRejection);
+    }
+
+    assert.strictEqual(unhandledRejections.length, 0);
+    assert.deepStrictEqual(exitCodes, [1]);
+    controller.dispose();
+});
+
 test("graceful shutdown evicts idle connections without aborting active connections", async () => {
     const connectionCalls = [];
     const fastify = createFastifyDouble();

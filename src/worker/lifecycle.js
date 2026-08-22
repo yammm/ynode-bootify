@@ -184,7 +184,12 @@ export function createLifecycleController({
                     await shutdownWithTimeout(signal);
                 } catch (ex) {
                     shutdownError = ex;
-                    fastify.log.error(ex, `Error during shutdown after ${signal}`);
+                    try {
+                        fastify.log.error(ex, `Error during shutdown after ${signal}`);
+                    } catch {
+                        // Guard against log.error throwing — terminationPromise
+                        // must never reject on the async "message" listener path.
+                    }
                 }
 
                 if (worker && (typeof worker.isConnected !== "function" || worker.isConnected())) {
@@ -192,7 +197,15 @@ export function createLifecycleController({
                         worker.disconnect();
                     } catch (ex) {
                         shutdownError ??= ex;
-                        fastify.log.error(ex, "Failed to disconnect cluster worker after shutdown");
+                        try {
+                            fastify.log.error(
+                                ex,
+                                "Failed to disconnect cluster worker after shutdown",
+                            );
+                        } catch {
+                            // Guard against log.error throwing — terminationPromise
+                            // must never reject on the async "message" listener path.
+                        }
                     }
                 }
 
