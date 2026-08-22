@@ -56,10 +56,9 @@ export default defineConfig([
         rules: {
             eqeqeq: ["error", "always"],
             "no-var": "error",
-            "prefer-const": "error",
+            "prefer-const": ["error", { destructuring: "all" }],
             "no-unused-vars": ["error", { args: "none", ignoreRestSiblings: true }],
             "no-implicit-coercion": ["warn", { allow: ["!!"] }],
-            curly: ["error", "all"],
             "simple-import-sort/imports": [
                 "error",
                 {
