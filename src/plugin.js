@@ -223,13 +223,17 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
         if (manager && typeof manager.reload === "function") {
             sighupHandler = () => {
                 // Intentional fire-and-forget — reload runs in the background.
-                void Promise.resolve(manager.reload()).catch((ex) => {
-                    try {
-                        log.error(ex, "SIGHUP-triggered reload failed.");
-                    } catch {
-                        // Guard against log.error throwing — avoid unhandled rejection.
-                    }
-                });
+                // Deferring the reload() call into .then() captures a synchronous
+                // throw that would otherwise escape the signal handler.
+                void Promise.resolve()
+                    .then(() => manager.reload())
+                    .catch((ex) => {
+                        try {
+                            log.error(ex, "SIGHUP-triggered reload failed.");
+                        } catch {
+                            // Guard against log.error throwing — avoid unhandled rejection.
+                        }
+                    });
             };
             processTarget.on("SIGHUP", sighupHandler);
         }

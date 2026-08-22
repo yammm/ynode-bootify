@@ -149,6 +149,7 @@ test("bootify leaves SIGQUIT to the lifecycle owner and cleans up manager handle
     assert.strictEqual(processTarget.listenerCount("SIGHUP"), 1);
 
     processTarget.emit("SIGHUP");
+    await new Promise((resolve) => setImmediate(resolve));
     assert.strictEqual(reloadCalls, 1);
 
     await manager.close();
@@ -261,6 +262,58 @@ test("bootify catches and logs SIGHUP-triggered reload failures", async () => {
     }
 
     assert.strictEqual(unhandledRejections.length, 0);
+    assert.strictEqual(errorLogs.length, 1);
+    assert.strictEqual(errorLogs[0][0], reloadError);
+    assert.match(errorLogs[0][1], /SIGHUP-triggered reload failed/);
+});
+
+test("bootify catches SIGHUP reload failures thrown synchronously", async () => {
+    const processTarget = new EventEmitter();
+    const bootifyState = createBootifyState();
+    const reloadError = new Error("sync reload failed");
+    const unhandledRejections = [];
+    const uncaughtExceptions = [];
+    const errorLogs = [];
+    const log = createLogStub();
+    log.error = (...args) => {
+        errorLogs.push(args);
+    };
+
+    const onUnhandledRejection = (reason) => {
+        unhandledRejections.push(reason);
+    };
+    const onUncaughtException = (err) => {
+        uncaughtExceptions.push(err);
+    };
+    process.on("unhandledRejection", onUnhandledRejection);
+    process.on("uncaughtExceptionMonitor", onUncaughtException);
+
+    try {
+        await bootify({
+            app: async () => async () => {},
+            config: { cluster: true },
+            pkg: { name: "test", version: "1.0.0" },
+            _internal: {
+                process: processTarget,
+                ylog: () => log,
+                ...bootifyState,
+                run: async () => ({
+                    reload: () => {
+                        throw reloadError;
+                    },
+                }),
+            },
+        });
+
+        processTarget.emit("SIGHUP");
+        await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+        process.off("unhandledRejection", onUnhandledRejection);
+        process.off("uncaughtExceptionMonitor", onUncaughtException);
+    }
+
+    assert.strictEqual(unhandledRejections.length, 0);
+    assert.strictEqual(uncaughtExceptions.length, 0);
     assert.strictEqual(errorLogs.length, 1);
     assert.strictEqual(errorLogs[0][0], reloadError);
     assert.match(errorLogs[0][1], /SIGHUP-triggered reload failed/);
