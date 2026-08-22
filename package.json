@@ -1,6 +1,6 @@
 {
     "name": "@ynode/bootify",
-    "version": "1.16.0+336704",
+    "version": "1.16.0+336705",
     "description": "A standardized Fastify application bootstrapper with built-in cluster management, graceful shutdown, and configuration wiring for the @ynode ecosystem.",
     "main": "src/plugin.js",
     "types": "index.d.ts",
@@ -38,7 +38,7 @@
         "ynode"
     ],
     "engines": {
-        "node": ">=20.10.0"
+        "node": ">=20.19.0"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
