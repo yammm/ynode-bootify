@@ -47,6 +47,17 @@ export interface BootifyAutoshutdownOptions {
     hookTimeout?: AutoshutdownOptions["hookTimeout"];
     closeTimeout?: number;
     onShutdownStart?: AutoshutdownOptions["onShutdownStart"];
+    onShutdownCommit?: (
+        event: {
+            trigger: string;
+            pid: number;
+            inFlight: number;
+            nextAt: number | null;
+            startedAt: number;
+            committedAt: number;
+        },
+        app: FastifyInstance,
+    ) => void | Promise<void>;
     onShutdownComplete?: AutoshutdownOptions["onShutdownComplete"];
 }
 

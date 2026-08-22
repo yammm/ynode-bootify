@@ -79,6 +79,7 @@ test("createServer registers autoshutdown only for worker processes", async () =
 });
 
 test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
+    const onShutdownCommit = () => {};
     const ownedDefaults = {
         exitProcess: true,
         reportLoad: false,
@@ -91,9 +92,22 @@ test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
     });
     assert.deepStrictEqual(
         buildAutoshutdownOptions({
-            sleep: { sleep: 45, grace: 5, jitter: 0, closeTimeout: 2500 },
+            sleep: {
+                sleep: 45,
+                grace: 5,
+                jitter: 0,
+                closeTimeout: 2500,
+                onShutdownCommit,
+            },
         }),
-        { sleep: 45, grace: 5, jitter: 0, closeTimeout: 2500, ...ownedDefaults },
+        {
+            sleep: 45,
+            grace: 5,
+            jitter: 0,
+            closeTimeout: 2500,
+            onShutdownCommit,
+            ...ownedDefaults,
+        },
     );
 });
 
@@ -133,6 +147,7 @@ test("buildAutoshutdownOptions validates object-form settings before worker star
         ["hookTimeout", -1],
         ["closeTimeout", 0],
         ["onShutdownStart", true],
+        ["onShutdownCommit", "yes"],
         ["onShutdownComplete", "later"],
     ]) {
         assert.throws(

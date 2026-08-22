@@ -16,6 +16,7 @@ const IDLE_OPTION_NAMES = new Set([
     "hookTimeout",
     "closeTimeout",
     "onShutdownStart",
+    "onShutdownCommit",
     "onShutdownComplete",
 ]);
 
@@ -44,9 +45,9 @@ function assertClusterOwnedOption(name, value) {
 }
 
 /**
- * Validates Bootify's complete worker autoshutdown boundary before any worker
- * is forked. This is the single validation path used by both the primary and
- * worker server factory.
+ * Validates Bootify's worker autoshutdown boundary before any worker is
+ * forked. buildAutoshutdownOptions invokes the same boundary in both the
+ * primary process and worker server factory.
  * @param {object} options - Normalized worker autoshutdown options.
  * @returns {void}
  */
