@@ -85,19 +85,34 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
             }
         });
 
-        const registerAutoShutdownHook = () => {
-            if (typeof fastify.onAutoShutdownStart === "function") {
+        const registerAutoShutdownHooks = () => {
+            if (
+                typeof fastify.onAutoShutdownStart === "function" &&
+                typeof controller.handleAutoShutdownStart === "function"
+            ) {
                 fastify.onAutoShutdownStart(controller.handleAutoShutdownStart);
+            }
+            if (
+                typeof fastify.onAutoShutdownCommit === "function" &&
+                typeof controller.handleAutoShutdownCommit === "function"
+            ) {
+                fastify.onAutoShutdownCommit(controller.handleAutoShutdownCommit);
+            }
+            if (
+                typeof fastify.onAutoShutdownComplete === "function" &&
+                typeof controller.handleAutoShutdownComplete === "function"
+            ) {
+                fastify.onAutoShutdownComplete(controller.handleAutoShutdownComplete);
             }
         };
         if (typeof fastify.onAutoShutdownStart === "function") {
-            registerAutoShutdownHook();
+            registerAutoShutdownHooks();
         } else if (typeof fastify.after === "function") {
             fastify.after((err) => {
                 if (err) {
                     throw err;
                 }
-                registerAutoShutdownHook();
+                registerAutoShutdownHooks();
             });
         }
 

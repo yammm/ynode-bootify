@@ -161,7 +161,7 @@ test("createLifecycleController still closes fastify when onShutdown hook throws
     controller.dispose();
 });
 
-test("autoshutdown and Fastify close run the application shutdown hook exactly once", async () => {
+test("committed autoshutdown and Fastify close run the application shutdown hook exactly once", async () => {
     const signalTarget = new EventEmitter();
     const fastify = createFastifyDouble();
     const shutdownSignals = [];
@@ -177,6 +177,9 @@ test("autoshutdown and Fastify close run the application shutdown hook exactly o
     });
 
     await controller.handleAutoShutdownStart({ trigger: "idle_timer" });
+    assert.strictEqual(controller.shutdownSignal.aborted, false);
+    assert.deepStrictEqual(shutdownSignals, []);
+    await controller.handleAutoShutdownCommit({ trigger: "idle_timer" });
     await controller.handleFastifyClose();
     await controller.handleFastifyClose();
 
@@ -184,7 +187,7 @@ test("autoshutdown and Fastify close run the application shutdown hook exactly o
     assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
 });
 
-test("Fastify close surfaces an autoshutdown hook failure once", async () => {
+test("Fastify close surfaces a committed autoshutdown hook failure once", async () => {
     const controller = createLifecycleController({
         fastify: createFastifyDouble(),
         config: {},
@@ -198,12 +201,33 @@ test("Fastify close surfaces an autoshutdown hook failure once", async () => {
         worker: null,
     });
 
-    await assert.rejects(
-        () => controller.handleAutoShutdownStart({ trigger: "idle_timer" }),
-        /autoshutdown-hook-failed/,
-    );
+    await controller.handleAutoShutdownStart({ trigger: "idle_timer" });
+    await assert.rejects(() => controller.handleAutoShutdownCommit(), /autoshutdown-hook-failed/);
     await assert.rejects(() => controller.handleFastifyClose(), /autoshutdown-hook-failed/);
     controller.dispose();
+});
+
+test("vetoed autoshutdown attempts do not abort or run application shutdown", async () => {
+    const shutdownSignals = [];
+    const controller = createLifecycleController({
+        fastify: createFastifyDouble(),
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onShutdown: ({ signal }) => shutdownSignals.push(signal),
+        },
+        signalTarget: new EventEmitter(),
+        worker: null,
+    });
+
+    await controller.handleAutoShutdownStart({ trigger: "idle_timer" });
+    await controller.handleAutoShutdownComplete({ trigger: "idle_timer", outcome: "vetoed" });
+
+    assert.strictEqual(controller.shutdownSignal.aborted, false);
+    assert.deepStrictEqual(shutdownSignals, []);
+
+    await controller.handleFastifyClose();
+    assert.deepStrictEqual(shutdownSignals, ["fastify-close"]);
 });
 
 test("createLifecycleController ignores null worker messages", async () => {

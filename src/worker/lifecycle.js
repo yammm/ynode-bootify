@@ -41,7 +41,7 @@ export function resolveListenAddress(server) {
  * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
  * @param {object} [options.processTarget] - Process-like target for worker exit (default: signalTarget).
  * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
- * @returns {{ lifecycleContext: object, shutdownSignal: AbortSignal, gracefulShutdown: function(string=): Promise<void>, shutdownWithTimeout: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
+ * @returns {{ lifecycleContext: object, shutdownSignal: AbortSignal, gracefulShutdown: function(string=): Promise<void>, shutdownWithTimeout: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleAutoShutdownCommit: function(object=): Promise<void>, handleAutoShutdownComplete: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
  */
 export function createLifecycleController({
     fastify,
@@ -317,16 +317,31 @@ export function createLifecycleController({
         }
     };
 
+    let pendingAutoShutdownTrigger = null;
     const handleAutoShutdownStart = async (event = {}) => {
+        pendingAutoShutdownTrigger = event.trigger ?? "autoshutdown";
+    };
+
+    const handleAutoShutdownCommit = async (event = {}) => {
+        const trigger = event.trigger ?? pendingAutoShutdownTrigger ?? "autoshutdown";
+        pendingAutoShutdownTrigger = null;
         beginShutdown();
-        await runShutdownHook(event.trigger ?? "autoshutdown");
+        await runShutdownHook(trigger);
+    };
+
+    const handleAutoShutdownComplete = async (event = {}) => {
+        if (event.outcome !== "closed") {
+            pendingAutoShutdownTrigger = null;
+        }
     };
 
     const handleFastifyClose = async () => {
+        const signal = pendingAutoShutdownTrigger ?? "fastify-close";
+        pendingAutoShutdownTrigger = null;
         beginShutdown();
         let hookError = null;
         try {
-            await runShutdownHook("fastify-close");
+            await runShutdownHook(signal);
         } catch (ex) {
             hookError = ex;
         } finally {
@@ -344,6 +359,8 @@ export function createLifecycleController({
         gracefulShutdown,
         shutdownWithTimeout,
         handleAutoShutdownStart,
+        handleAutoShutdownCommit,
+        handleAutoShutdownComplete,
         handleFastifyClose,
         dispose,
     };
