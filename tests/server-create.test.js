@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import cluster from "node:cluster";
 import { test } from "node:test";
 
-import { buildAutoshutdownOptions, createServer } from "../src/server.js";
+import { buildAutoshutdownOptions } from "../src/autoshutdown.js";
+import { createServer } from "../src/server.js";
 import { createLogStub } from "../test-utils/log-stub.js";
 
 async function withWorkerFlag(workerFlag, fn) {

@@ -18,8 +18,6 @@ import proxiable from "proxiable";
 import { buildAutoshutdownOptions } from "./autoshutdown.js";
 import { rewriteUrl } from "./rewrite.js";
 
-export { buildAutoshutdownOptions } from "./autoshutdown.js";
-
 /**
  * Creates and configures a Fastify server instance.
  * @param {object} config - The configuration object from yargs.

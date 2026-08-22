@@ -33,8 +33,6 @@ import { pathToFileURL } from "node:url";
 
 // server factory function
 import { run } from "@ynode/cluster";
-// configs
-// import pkg from "${process.cwd()}/package.json" with { type: "json" };
 // logging
 import ylog from "@ynode/ylog";
 
