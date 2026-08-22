@@ -1,6 +1,8 @@
 name: autover
 
 on:
+    push:
+        branches: [main]
     pull_request:
         types: [opened, synchronize, reopened, labeled, unlabeled]
     workflow_dispatch:
@@ -79,18 +81,15 @@ jobs:
                       core.setOutput('number', pr.number.toString());
                       core.setOutput('has_required', hasRequired ? 'true' : 'false');
 
-            - name: Exit if no PR or missing required label
-              if: ${{ steps.pr.outputs.found != 'true' || steps.pr.outputs.has_required != 'true' }}
-              run: |
-                  echo "Guarded apply skipped."
-                  exit 0
-
             - name: Configure Git author
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
             - name: Run autover (apply)
+              # exit 0 in a step never skips later steps, so the label guard
+              # lives here while changelog regeneration runs for every push.
+              if: ${{ steps.pr.outputs.found == 'true' && steps.pr.outputs.has_required == 'true' }}
               id: apply_autover
               run: |
                   set -euo pipefail
