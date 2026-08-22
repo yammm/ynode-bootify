@@ -1,4 +1,8 @@
 /**
+ * @fileoverview events.js: EventEmitter compatibility helpers.
+ */
+
+/**
  * Remove an event listener from an EventEmitter-like target.
  * Supports both modern `off()` and legacy `removeListener()`.
  * @param {object} target - EventEmitter-like target.

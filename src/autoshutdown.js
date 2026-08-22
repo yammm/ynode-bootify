@@ -1,3 +1,11 @@
+/**
+ * @fileoverview autoshutdown.js: Idle-only Autoshutdown option boundary.
+ *
+ * Bootify owns the boundary between Autoshutdown and Cluster: only idle
+ * shutdown settings pass through, while Cluster keeps ownership of worker
+ * heartbeat, memory retirement, and process lifecycle settings.
+ */
+
 const IDLE_OPTION_NAMES = new Set([
     "sleep",
     "grace",
