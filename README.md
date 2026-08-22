@@ -16,7 +16,7 @@ A Fastify bootstrap plugin that incorporates standardized @ynode patterns for cl
 
 ## Installation
 
-Requires Node.js 20.10.0 or newer.
+Requires Node.js 20.19.0 or newer.
 
 ```sh
 npm install @ynode/bootify
