@@ -11,6 +11,10 @@ async function expectTypeError(fn, pattern) {
     });
 }
 
+test("bootify called without arguments reports the app option error", async () => {
+    await expectTypeError(() => bootify(), /Invalid "app" option/);
+});
+
 test("bootify rejects invalid app option", async () => {
     await expectTypeError(
         () =>

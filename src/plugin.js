@@ -119,7 +119,7 @@ function resolveClusterOptions(clusterConfig) {
  * @param {object} [options._internal] - Internal test hooks.
  * @returns {Promise<object|void>} Cluster manager in the primary process, otherwise void.
  */
-export async function bootify({ app, config, pkg, tty, validator, hooks, _internal = {} }) {
+export async function bootify({ app, config, pkg, tty, validator, hooks, _internal = {} } = {}) {
     const processTarget = _internal.process ?? process;
     const runFn = _internal.run ?? run;
     const ylogFn = _internal.ylog ?? ylog;
