@@ -160,7 +160,7 @@ test("listen retries failures and logs errors as structured data", async () => {
         },
     };
 
-    await listen(fastify, 2, 0);
+    await listen(fastify, { retries: 2, delay: 0 });
 
     assert.strictEqual(attempts, 2);
     assert.deepStrictEqual(warnings, [
@@ -183,7 +183,7 @@ test("listen omits the environment clause when no environment is configured", as
         },
     };
 
-    await listen(fastify, 1, 0);
+    await listen(fastify, { retries: 1, delay: 0 });
 
     assert.strictEqual(
         capturedListenConfig.listenTextResolver("http://127.0.0.1:3000"),
@@ -211,7 +211,7 @@ test("listen aborts a pending retry when worker shutdown begins", async () => {
     };
 
     await assert.rejects(
-        () => listen(fastify, 3, 1000, { signal: shutdownController.signal }),
+        () => listen(fastify, { retries: 3, delay: 1000, signal: shutdownController.signal }),
         (err) => err?.name === "AbortError",
     );
 
@@ -236,7 +236,7 @@ test("listen exhausts the configured attempts and rethrows the last error", asyn
         },
     };
 
-    await assert.rejects(() => listen(fastify, 2, 0), listenError);
+    await assert.rejects(() => listen(fastify, { retries: 2, delay: 0 }), listenError);
 
     assert.strictEqual(attempts, 2);
     assert.deepStrictEqual(errorLogs, [["All startup listen attempts exhausted."]]);

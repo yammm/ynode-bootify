@@ -201,13 +201,13 @@ async function retryOperation(operation, { retries = 5, delay = 100, onRetry, si
 /**
  * Tell Fastify to start listening with retry logic.
  * @param {object} fastify - Fastify instance.
- * @param {number} [retries=5] - Maximum number of listen attempts.
- * @param {number} [delay=100] - Delay in milliseconds between attempts.
  * @param {object} [options] - Listen execution options.
+ * @param {number} [options.retries=5] - Maximum number of listen attempts.
+ * @param {number} [options.delay=100] - Delay in milliseconds between attempts.
  * @param {AbortSignal} [options.signal] - Cancels retries during shutdown.
  * @returns {Promise<void>}
  */
-export async function listen(fastify, retries = 5, delay = 100, { signal } = {}) {
+export async function listen(fastify, { retries = 5, delay = 100, signal } = {}) {
     const config = fastify.config;
     const pkg = fastify.pkg;
 

@@ -111,8 +111,8 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
             await hooks.onBeforeListen(lifecycleContext);
         }
 
-        const retry = resolveListenRetry(config);
-        await listenFn(fastify, retry.retries, retry.delay, { signal: shutdownSignal });
+        const { retries, delay } = resolveListenRetry(config);
+        await listenFn(fastify, { retries, delay, signal: shutdownSignal });
 
         if (typeof hooks.onAfterListen === "function") {
             try {
