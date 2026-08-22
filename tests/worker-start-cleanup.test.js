@@ -36,6 +36,59 @@ function createFastifyStub() {
     };
 }
 
+test("start exposes one lifecycle handle to application code and hooks", async () => {
+    const signalTarget = new EventEmitter();
+    const fastify = createFastifyStub();
+    const observed = {};
+
+    await start({
+        app: async (instance) => {
+            observed.application = instance.bootify;
+            return async () => {};
+        },
+        config: { listen: 0, environment: "test" },
+        log: fastify.log,
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onBeforeListen: ({ lifecycle }) => {
+                observed.before = lifecycle;
+                assert.strictEqual(lifecycle.phase, "starting");
+                assert.strictEqual(lifecycle.address, null);
+            },
+            onAfterListen: async ({ lifecycle, address }) => {
+                observed.after = lifecycle;
+                assert.strictEqual(lifecycle.phase, "listening");
+                assert.strictEqual(lifecycle.address, address);
+                await lifecycle.shutdown("test-complete");
+            },
+            onShutdown: ({ lifecycle, signal }) => {
+                observed.shutdown = lifecycle;
+                observed.shutdownTrigger = signal;
+                assert.strictEqual(lifecycle.phase, "shutting-down");
+                assert.strictEqual(lifecycle.shutdownSignal.aborted, true);
+            },
+        },
+        _internal: {
+            createServer: async () => fastify,
+            listen: async () => {},
+            createLifecycleController: (context) =>
+                createLifecycleController({
+                    ...context,
+                    signalTarget,
+                    worker: null,
+                }),
+        },
+    });
+
+    assert.strictEqual(observed.application, observed.before);
+    assert.strictEqual(observed.application, observed.after);
+    assert.strictEqual(observed.application, observed.shutdown);
+    assert.strictEqual(observed.shutdownTrigger, "test-complete");
+    assert.strictEqual(observed.application.phase, "closed");
+    assert.strictEqual(fastify.closeCalls, 1);
+    assert.strictEqual(signalTarget.listenerCount("SIGTERM"), 0);
+});
+
 test("start disposes signal listeners when startup fails before listen completes", async () => {
     const signalTarget = new EventEmitter();
     const fastify = createFastifyStub();

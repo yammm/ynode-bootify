@@ -18,6 +18,56 @@ function createFastifyDouble() {
     };
 }
 
+test("public lifecycle handle exposes state and joins programmatic shutdown", async () => {
+    const signalTarget = new EventEmitter();
+    const worker = new EventEmitter();
+    let disconnectCalls = 0;
+    worker.isConnected = () => true;
+    worker.disconnect = () => {
+        ++disconnectCalls;
+    };
+    const fastify = createFastifyDouble();
+    const shutdownContexts = [];
+    const controller = createLifecycleController({
+        fastify,
+        config: {},
+        pkg: { name: "test", version: "1.0.0" },
+        hooks: {
+            onShutdown: (context) => {
+                shutdownContexts.push(context);
+            },
+        },
+        signalTarget,
+        worker,
+    });
+
+    assert.strictEqual(controller.lifecycle.phase, "starting");
+    assert.strictEqual(controller.lifecycle.address, null);
+    assert.strictEqual(controller.lifecycle.shutdownSignal.aborted, false);
+    assert.strictEqual(controller.lifecycleContext.lifecycle, controller.lifecycle);
+
+    controller.markListening("127.0.0.1:3000");
+    assert.strictEqual(controller.lifecycle.phase, "listening");
+    assert.strictEqual(controller.lifecycle.address, "127.0.0.1:3000");
+
+    const first = controller.lifecycle.shutdown("admin-api");
+    const second = controller.lifecycle.shutdown("ignored-second-trigger");
+    await Promise.all([first, second]);
+
+    assert.strictEqual(fastify.closeCalls, 1);
+    assert.strictEqual(disconnectCalls, 1);
+    assert.strictEqual(controller.lifecycle.phase, "closed");
+    assert.strictEqual(controller.lifecycle.address, "127.0.0.1:3000");
+    assert.strictEqual(controller.lifecycle.shutdownSignal.aborted, true);
+    assert.strictEqual(shutdownContexts.length, 1);
+    assert.strictEqual(shutdownContexts[0].signal, "admin-api");
+    assert.strictEqual(shutdownContexts[0].lifecycle, controller.lifecycle);
+    assert.strictEqual(shutdownContexts[0].lifecycle.phase, "closed");
+
+    await assert.rejects(controller.lifecycle.shutdown("   "), /Expected a non-empty string/);
+    controller.dispose();
+});
+
 test("createLifecycleController handles repeated signals idempotently", async () => {
     const signalTarget = new EventEmitter();
     const fastify = createFastifyDouble();

@@ -140,6 +140,39 @@ Initializes the application lifecycle. `bootify` validates option shapes early a
 - `onAfterListen(context)`: Receives `{ fastify, config, pkg, address }`.
 - `onShutdown(context)`: Receives `{ fastify, config, pkg, signal }` and runs exactly once for signal, reload, startup-cleanup, idle-Autoshutdown, and direct Fastify-close paths. Non-signal triggers include `idle_timer`, `startup-error`, and `fastify-close`.
 
+Every hook context also includes `lifecycle`, the same public lifecycle handle exposed to application code as `fastify.bootify`.
+
+#### Runtime Lifecycle Handle
+
+`fastify.bootify` is available before the application factory runs and is also exposed as `context.lifecycle` in every Bootify hook. It does not change `bootify()`'s existing `void | BootifyManager` return contract.
+
+| Member | Type | Behavior |
+| :-- | :-- | :-- |
+| `phase` | `"starting" \| "listening" \| "shutting-down" \| "closed"` | Live read-only lifecycle phase. |
+| `address` | `string \| null` | Bound address after listen succeeds; retained after close for diagnostics. |
+| `shutdownSignal` | `AbortSignal` | Aborts exactly once when shutdown begins, before `onShutdown` runs. |
+| `shutdown(trigger?)` | `Promise<void>` | Starts Bootify's bounded, once-only shutdown path. The default trigger is `"programmatic"`; custom triggers must be non-empty strings. |
+
+```javascript
+export default async function application(fastify) {
+    fastify.bootify.shutdownSignal.addEventListener("abort", () => {
+        queueConsumer.stopAcceptingWork();
+    });
+
+    // Trigger shutdown from a control channel that is not part of the HTTP
+    // workload Fastify must drain.
+    controlChannel.once("shutdown", () => {
+        void fastify.bootify.shutdown("control-channel").catch((err) => {
+            fastify.log.error({ err }, "Programmatic shutdown failed");
+        });
+    });
+}
+```
+
+Concurrent shutdown requests join the same underlying close and worker-disconnect sequence, and `onShutdown` still runs exactly once with the first trigger. In cluster workers, a successful programmatic shutdown disconnects the worker after Fastify closes; in single-process mode it closes Fastify without calling `process.exit()`.
+
+Do not await `shutdown()` from an HTTP request that the same Fastify instance must drain: `fastify.close()` waits for that request to finish, so the request and shutdown would wait on each other until the configured shutdown timeout. Finish the response first and trigger shutdown after the request settles, or use a process/control channel as above.
+
 #### Return Value
 
 `bootify(options)` resolves to one of:

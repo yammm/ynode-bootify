@@ -2,6 +2,7 @@ import {
     bootify,
     type BootifyConfig,
     type BootifyLifecycleContext,
+    type BootifyLifecyclePhase,
     type BootifyResult,
     type BootOptions,
 } from "@ynode/bootify";
@@ -15,6 +16,14 @@ const config: BootifyConfig = {
 };
 
 const plugin: FastifyPluginAsync = async (app) => {
+    const phase: BootifyLifecyclePhase = app.bootify.phase;
+    const address: string | null = app.bootify.address;
+    const shutdownSignal: AbortSignal = app.bootify.shutdownSignal;
+    const programmaticShutdown: Promise<void> = app.bootify.shutdown("type-test");
+    void phase;
+    void address;
+    void shutdownSignal;
+    void programmaticShutdown;
     app.get("/health", async () => ({ ok: true }));
 };
 
@@ -25,6 +34,12 @@ const options: BootOptions = {
     hooks: {
         onBeforeListen(context: BootifyLifecycleContext) {
             context.fastify.log.info(context.pkg);
+            const phase: BootifyLifecyclePhase = context.lifecycle.phase;
+            const address: string | null = context.lifecycle.address;
+            const shutdownSignal: AbortSignal = context.lifecycle.shutdownSignal;
+            void phase;
+            void address;
+            void shutdownSignal;
         },
         onShutdown({ signal }) {
             const shutdownSignal: string = signal;

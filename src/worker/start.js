@@ -100,6 +100,10 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
         handleFastifyClose = controller.handleFastifyClose;
         dispose = controller.dispose;
 
+        if (controller.lifecycle) {
+            fastify.decorate("bootify", controller.lifecycle);
+        }
+
         fastify.addHook("onClose", async () => {
             if (handleFastifyClose) {
                 await handleFastifyClose();
@@ -152,11 +156,14 @@ export async function start({ app, config, log, pkg, hooks = {}, _internal = {} 
         const { retries, delay } = resolveListenRetry(config);
         await listenFn(fastify, { retries, delay, signal: shutdownSignal });
 
+        const address = resolveListenAddress(fastify.server);
+        controller.markListening?.(address);
+
         if (typeof hooks.onAfterListen === "function") {
             try {
                 await hooks.onAfterListen({
                     ...lifecycleContext,
-                    address: resolveListenAddress(fastify.server),
+                    address,
                 });
             } catch (ex) {
                 startupShutdownSignal = "onAfterListen-error";

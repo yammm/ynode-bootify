@@ -64,7 +64,7 @@ export function resolveListenAddress(server) {
  * @param {object} [options.signalTarget] - EventEmitter for signal listeners (default: process).
  * @param {object} [options.processTarget] - Process-like target for worker exit (default: signalTarget).
  * @param {object} [options.worker] - Cluster worker instance (default: cluster.worker).
- * @returns {{ lifecycleContext: object, shutdownSignal: AbortSignal, gracefulShutdown: function(string=): Promise<void>, shutdownWithTimeout: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleAutoShutdownCommit: function(object=): Promise<void>, handleAutoShutdownComplete: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
+ * @returns {{ lifecycle: object, lifecycleContext: object, shutdownSignal: AbortSignal, markListening: function(string): void, gracefulShutdown: function(string=): Promise<void>, shutdownWithTimeout: function(string=): Promise<void>, handleAutoShutdownStart: function(object=): Promise<void>, handleAutoShutdownCommit: function(object=): Promise<void>, handleAutoShutdownComplete: function(object=): Promise<void>, handleFastifyClose: function(): Promise<void>, dispose: function(): void }}
  */
 export function createLifecycleController({
     fastify,
@@ -75,9 +75,57 @@ export function createLifecycleController({
     processTarget = signalTarget,
     worker = cluster.worker,
 }) {
-    const lifecycleContext = { fastify, config, pkg };
     const shutdownController = new AbortController();
+    const lifecycleState = {
+        phase: "starting",
+        address: null,
+    };
+    let shutdownWorker = null;
+
+    const lifecycle = Object.freeze({
+        get phase() {
+            return lifecycleState.phase;
+        },
+        get address() {
+            return lifecycleState.address;
+        },
+        get shutdownSignal() {
+            return shutdownController.signal;
+        },
+        async shutdown(trigger = "programmatic") {
+            if (typeof trigger !== "string" || trigger.trim() === "") {
+                throw new TypeError(
+                    "Invalid lifecycle shutdown trigger. Expected a non-empty string.",
+                );
+            }
+            if (lifecycleState.phase === "closed") {
+                return;
+            }
+
+            const shutdownError = await shutdownWorker(trigger.trim());
+            if (shutdownError) {
+                throw shutdownError;
+            }
+        },
+    });
+    const lifecycleContext = { fastify, config, pkg, lifecycle };
+
+    const markListening = (address) => {
+        if (lifecycleState.phase !== "starting") {
+            return;
+        }
+        lifecycleState.address = address;
+        lifecycleState.phase = "listening";
+    };
+
+    const markClosed = () => {
+        lifecycleState.phase = "closed";
+    };
+
     const beginShutdown = () => {
+        if (lifecycleState.phase !== "closed") {
+            lifecycleState.phase = "shutting-down";
+        }
         if (!shutdownController.signal.aborted) {
             shutdownController.abort();
         }
@@ -155,6 +203,10 @@ export function createLifecycleController({
                     closeError = ex;
                 }
 
+                if (!closeError) {
+                    markClosed();
+                }
+
                 if (hookError && closeError) {
                     throw new AggregateError([hookError, closeError], "Multiple shutdown errors.");
                 }
@@ -198,7 +250,7 @@ export function createLifecycleController({
     let exitAfterShutdown = false;
     let terminationPromise = null;
 
-    const shutdownWorker = async (signal, { exitAfter = false } = {}) => {
+    shutdownWorker = async (signal, { exitAfter = false } = {}) => {
         exitAfterShutdown ||= exitAfter;
         if (!terminationPromise) {
             terminationPromise = (async () => {
@@ -240,6 +292,8 @@ export function createLifecycleController({
                 } else if (shutdownError && "exitCode" in processTarget) {
                     processTarget.exitCode = 1;
                 }
+
+                return shutdownError;
             })();
         }
         return terminationPromise;
@@ -353,7 +407,9 @@ export function createLifecycleController({
     };
 
     const handleAutoShutdownComplete = async (event = {}) => {
-        if (event.outcome !== "closed") {
+        if (event.outcome === "closed") {
+            markClosed();
+        } else {
             pendingAutoShutdownTrigger = null;
         }
     };
@@ -368,6 +424,7 @@ export function createLifecycleController({
         } catch (ex) {
             hookError = ex;
         } finally {
+            markClosed();
             dispose();
         }
 
@@ -377,8 +434,10 @@ export function createLifecycleController({
     };
 
     return {
+        lifecycle,
         lifecycleContext,
         shutdownSignal: shutdownController.signal,
+        markListening,
         gracefulShutdown,
         shutdownWithTimeout,
         handleAutoShutdownStart,

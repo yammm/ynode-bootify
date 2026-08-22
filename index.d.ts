@@ -62,10 +62,29 @@ export interface BootifyConfig extends Record<string, any> {
     listenRetry?: ListenRetryOptions;
 }
 
+export type BootifyLifecyclePhase = "starting" | "listening" | "shutting-down" | "closed";
+
+export interface BootifyLifecycleHandle {
+    /** Current worker/server lifecycle phase. */
+    readonly phase: BootifyLifecyclePhase;
+    /** Bound listen address once available; retained after shutdown for diagnostics. */
+    readonly address: string | null;
+    /** Aborts exactly once when shutdown commits or otherwise begins. */
+    readonly shutdownSignal: AbortSignal;
+    /**
+     * Starts the existing bounded, once-only shutdown path. Concurrent calls join
+     * the active shutdown; the first trigger wins. Cluster workers disconnect
+     * after closing, while single-process applications remain in-process.
+     * @param trigger Non-empty shutdown source. @default "programmatic"
+     */
+    shutdown(trigger?: string): Promise<void>;
+}
+
 export interface BootifyLifecycleContext {
     fastify: FastifyInstance;
     config: BootifyConfig;
     pkg: Record<string, any>;
+    lifecycle: BootifyLifecycleHandle;
 }
 
 export interface BootifyAfterListenContext extends BootifyLifecycleContext {
@@ -128,6 +147,7 @@ declare module "fastify" {
         clusterMinWorkers: number;
         clusterMaxWorkers: number;
         clusterMode: "smart" | "max";
+        bootify: BootifyLifecycleHandle;
     }
 }
 
