@@ -16,9 +16,12 @@ const IDLE_OPTION_NAMES = new Set([
     "hookTimeout",
     "closeTimeout",
     "onShutdownStart",
-    "onShutdownCommit",
     "onShutdownComplete",
 ]);
+
+// `onShutdownCommit` intentionally remains internal to Bootify's lifecycle
+// adapter until the minimum @ynode/autoshutdown dependency exposes that public
+// option. Accepting it here would break older releases allowed by ^1.9.0.
 
 const MAX_TIMER_MS = 2 ** 31 - 1;
 const IDLE_DEFAULTS = Object.freeze({ sleep: 30 * 60, jitter: 5 });
@@ -96,7 +99,7 @@ export function validateAutoshutdownOptions(options) {
     if (options.force !== undefined && typeof options.force !== "boolean") {
         throw new TypeError('Invalid "config.sleep.force" option. Expected a boolean.');
     }
-    for (const name of ["onShutdownStart", "onShutdownCommit", "onShutdownComplete"]) {
+    for (const name of ["onShutdownStart", "onShutdownComplete"]) {
         const value = options[name];
         if (value !== undefined && value !== null && typeof value !== "function") {
             throw new TypeError(`Invalid "config.sleep.${name}" option. Expected a function.`);

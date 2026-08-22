@@ -11,14 +11,7 @@ const config: BootifyConfig = {
     cluster: false,
     listen: { host: "127.0.0.1", port: 3000 },
     rewrite: { "/health": "/internal/health" },
-    sleep: {
-        sleep: 60,
-        grace: 0,
-        jitter: 0,
-        onShutdownCommit(event, app) {
-            app.log.info({ committedAt: event.committedAt });
-        },
-    },
+    sleep: { sleep: 60, grace: 0, jitter: 0 },
 };
 
 const plugin: FastifyPluginAsync = async (app) => {

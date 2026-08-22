@@ -79,7 +79,6 @@ test("createServer registers autoshutdown only for worker processes", async () =
 });
 
 test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
-    const onShutdownCommit = () => {};
     const ownedDefaults = {
         exitProcess: true,
         reportLoad: false,
@@ -92,22 +91,9 @@ test("buildAutoshutdownOptions only forwards idle shutdown settings", () => {
     });
     assert.deepStrictEqual(
         buildAutoshutdownOptions({
-            sleep: {
-                sleep: 45,
-                grace: 5,
-                jitter: 0,
-                closeTimeout: 2500,
-                onShutdownCommit,
-            },
+            sleep: { sleep: 45, grace: 5, jitter: 0, closeTimeout: 2500 },
         }),
-        {
-            sleep: 45,
-            grace: 5,
-            jitter: 0,
-            closeTimeout: 2500,
-            onShutdownCommit,
-            ...ownedDefaults,
-        },
+        { sleep: 45, grace: 5, jitter: 0, closeTimeout: 2500, ...ownedDefaults },
     );
 });
 
@@ -128,6 +114,10 @@ test("buildAutoshutdownOptions rejects Cluster-owned and unsupported settings", 
         () => buildAutoshutdownOptions({ sleep: { sleep: 45, typo: true } }),
         /config\.sleep\.typo.*Unsupported option/,
     );
+    assert.throws(
+        () => buildAutoshutdownOptions({ sleep: { sleep: 45, onShutdownCommit() {} } }),
+        /config\.sleep\.onShutdownCommit.*Unsupported option/,
+    );
     assert.throws(() => buildAutoshutdownOptions({ sleep: false }), /config\.sleep/);
     assert.throws(() => buildAutoshutdownOptions({ sleep: 0 }), /positive inactivity period/);
     assert.deepStrictEqual(
@@ -147,7 +137,6 @@ test("buildAutoshutdownOptions validates object-form settings before worker star
         ["hookTimeout", -1],
         ["closeTimeout", 0],
         ["onShutdownStart", true],
-        ["onShutdownCommit", "yes"],
         ["onShutdownComplete", "later"],
     ]) {
         assert.throws(
