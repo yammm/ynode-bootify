@@ -40,6 +40,7 @@ import ylog from "@ynode/ylog";
 
 import { buildAutoshutdownOptions } from "./autoshutdown.js";
 import { off } from "./events.js";
+import { assertRewriteConfig } from "./rewrite.js";
 import { start } from "./worker.js";
 
 const BOOTIFY_ONCE_ERROR = "bootify() can only be called once per process.";
@@ -187,6 +188,9 @@ export async function bootify({ app, config, pkg, tty, validator, hooks, _intern
         // Fail before forking workers if Bootify and Cluster would otherwise
         // compete for worker heartbeat, memory, or process lifecycle ownership.
         buildAutoshutdownOptions(config);
+
+        // Fail before forking workers on malformed rewrite targets.
+        assertRewriteConfig(config);
 
         if (!pkg) {
             const pkgUrl = pathToFileURL(join(process.cwd(), "package.json")).href;

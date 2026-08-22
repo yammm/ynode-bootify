@@ -88,6 +88,27 @@ test("bootify rejects invalid hooks.onAfterListen option", async () => {
     );
 });
 
+test("bootify rejects non-string rewrite targets before forking workers", async () => {
+    let runCalls = 0;
+
+    await expectTypeError(
+        () =>
+            bootify({
+                app: async () => async () => {},
+                config: { rewrite: { "/a": 42 } },
+                pkg: {},
+                _internal: {
+                    run: async () => {
+                        runCalls += 1;
+                    },
+                },
+            }),
+        /Invalid "config\.rewrite" target for "\/a"/,
+    );
+
+    assert.strictEqual(runCalls, 0);
+});
+
 test("bootify rejects null cluster configuration instead of enabling clustering", async () => {
     let runCalls = 0;
 
