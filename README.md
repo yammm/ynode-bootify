@@ -14,6 +14,10 @@ A Fastify bootstrap plugin that incorporates standardized @ynode patterns for cl
 - **Signal Handling**: Manages supported graceful shutdown signals (`SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGUSR2`) and zero-downtime reloads (`SIGHUP`) without competing with the cluster primary.
 - **Fastify Initialization**: Creates the server instance with standard configurations (like `proxiable` and `autoshutdown`).
 
+## Node.js support
+
+This package requires Node.js 20.19.0 or newer. CI exercises the exact 20.19.0, 22.13.0, and 24.0.0 boundaries. Node.js 20 remains tested only to preserve the current major-version contract even though upstream support has ended; use Node.js 22 or 24 for supported production deployments. A newly released Node.js major is not considered supported until it is added to CI, even when the open `engines` range admits it.
+
 ## Installation
 
 Requires Node.js 20.19.0 or newer.

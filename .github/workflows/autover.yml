@@ -1,154 +1,205 @@
 name: autover
 
 on:
-    push:
-        branches: [main]
     pull_request:
         types: [opened, synchronize, reopened, labeled, unlabeled]
+    push:
+        branches: [main]
     workflow_dispatch:
 
 permissions:
-    contents: write
-    pull-requests: write
+    contents: read
 
 env:
     REQUIRED_LABEL: autover-apply
-    CREATE_TAG: "false"
+
+concurrency:
+    group: autover-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false
 
 jobs:
     preview:
         if: ${{ github.event_name == 'pull_request' }}
         runs-on: ubuntu-latest
-        env:
-            CI: "true"
+        permissions:
+            contents: read
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
-                  node-version: "20"
-            - name: Run autover (dry-run)
-              id: autover
+                  persist-credentials: false
+
+            - name: Setup Node
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: "24.0.0"
+                  cache: npm
+
+            - name: Install reviewed dependencies
+              run: npm ci --ignore-scripts
+
+            - name: Preview autover
+              shell: bash
               run: |
                   set -euo pipefail
-                  line="$(npx --yes @mikinho/autover --workspaces --guard-unchanged --no-amend --dry-run --short)"
-                  echo "$line"
-                  echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
-            - name: Comment on PR with version summary
-              uses: actions/github-script@v9
-              with:
-                  script: |
-                      const summary = `${{ toJSON(steps.autover.outputs.summary) }}`.replace(/^"|"$/g, "");
-                      const body = summary && summary.trim().length
-                        ? `🧭 **autover** preview\n\n\`${summary}\``
-                        : "🧭 **autover** preview\n\n_No changes or summary unavailable._";
-                      await github.rest.issues.createComment({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        issue_number: context.issue.number,
-                        body
-                      });
+                  set +e
+                  summary="$(npx --no-install autover --workspaces --guard-unchanged --no-amend --no-skip-ci --dry-run --short 2>&1)"
+                  status=$?
+                  set -e
+                  if [[ "$status" -ne 0 && "$status" -ne 4 ]]; then
+                    printf '%s\n' "$summary" >&2
+                    exit "$status"
+                  fi
+                  {
+                    echo "### autover preview"
+                    echo
+                    echo '~~~text'
+                    printf '%s\n' "${summary:-No version change required.}"
+                    echo '~~~'
+                  } >> "$GITHUB_STEP_SUMMARY"
 
-    apply:
+    prepare:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]' }}
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read
+        outputs:
+            changed: ${{ steps.patch.outputs.changed }}
         steps:
-            - uses: actions/checkout@v7
+            - name: Checkout exact push
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   fetch-depth: 0
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: "20"
-            - name: Identify PR associated with this push
-              id: pr
-              uses: actions/github-script@v9
+                  persist-credentials: false
+
+            - name: Find associated labeled pull request
+              id: pull-request
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+              env:
+                  REQUIRED_LABEL: ${{ env.REQUIRED_LABEL }}
               with:
                   script: |
-                      const sha = context.sha;
-                      const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        commit_sha: sha,
-                      });
-                      if (!prs || prs.length === 0) {
-                        core.setOutput('found', 'false');
-                        return;
-                      }
-                      const pr = prs[0];
-                      const labels = pr.labels?.map(l => (typeof l === 'string' ? l : l.name)) || [];
-                      const required = process.env.REQUIRED_LABEL;
-                      const hasRequired = labels.includes(required);
-                      core.setOutput('found', 'true');
-                      core.setOutput('number', pr.number.toString());
-                      core.setOutput('has_required', hasRequired ? 'true' : 'false');
+                      const { data: pullRequests } =
+                        await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          commit_sha: context.sha,
+                        });
+                      const pullRequest =
+                        pullRequests.find(({ merge_commit_sha: sha }) => sha === context.sha) ??
+                        pullRequests[0];
+                      const labels = pullRequest?.labels?.map((label) =>
+                        typeof label === "string" ? label : label.name
+                      ) ?? [];
+                      core.setOutput(
+                        "apply",
+                        pullRequest && labels.includes(process.env.REQUIRED_LABEL)
+                          ? "true"
+                          : "false"
+                      );
 
-            - name: Configure Git author
+            - name: Setup Node
+              if: ${{ steps.pull-request.outputs.apply == 'true' }}
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: "24.0.0"
+                  cache: npm
+
+            - name: Install reviewed dependencies
+              if: ${{ steps.pull-request.outputs.apply == 'true' }}
+              run: npm ci --ignore-scripts
+
+            - name: Prepare release metadata patch
+              id: patch
+              if: ${{ steps.pull-request.outputs.apply == 'true' }}
+              shell: bash
               run: |
+                  set -euo pipefail
+                  set +e
+                  summary="$(npx --no-install autover --workspaces --guard-unchanged --no-amend --no-skip-ci --short 2>&1)"
+                  status=$?
+                  set -e
+                  if [[ "$status" -ne 0 && "$status" -ne 4 ]]; then
+                    printf '%s\n' "$summary" >&2
+                    exit "$status"
+                  fi
+                  npm run changelog
+
+                  unexpected="$(git diff --name-only -- . \\
+                    ':(exclude)package.json' \\
+                    ':(exclude)package-lock.json' \\
+                    ':(exclude)CHANGELOG.md')"
+                  if [[ -n "$unexpected" ]]; then
+                    printf 'autover changed unexpected paths:\n%s\n' "$unexpected" >&2
+                    exit 1
+                  fi
+
+                  git diff --binary -- package.json package-lock.json CHANGELOG.md \\
+                    > "$RUNNER_TEMP/autover.patch"
+                  if [[ -s "$RUNNER_TEMP/autover.patch" ]]; then
+                    echo "changed=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "changed=false" >> "$GITHUB_OUTPUT"
+                  fi
+                  {
+                    echo "### autover apply"
+                    echo
+                    echo '~~~text'
+                    printf '%s\n' "${summary:-No version change required.}"
+                    echo '~~~'
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Upload metadata patch
+              if: ${{ steps.patch.outputs.changed == 'true' }}
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: autover-${{ github.sha }}
+                  path: ${{ runner.temp }}/autover.patch
+                  if-no-files-found: error
+                  retention-days: 1
+
+    commit:
+        needs: prepare
+        if: ${{ needs.prepare.outputs.changed == 'true' }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Checkout exact push for the write-only phase
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ github.sha }}
+                  fetch-depth: 0
+                  persist-credentials: true
+
+            - name: Download metadata patch
+              uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+              with:
+                  name: autover-${{ github.sha }}
+                  path: ${{ runner.temp }}/autover
+
+            - name: Verify, commit, and push metadata only
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  patch="$RUNNER_TEMP/autover/autover.patch"
+                  git apply --check "$patch"
+                  git apply "$patch"
+
+                  while IFS= read -r -d '' file; do
+                    case "$file" in
+                      package.json|package-lock.json|CHANGELOG.md) ;;
+                      *)
+                        printf 'refusing unexpected patched path: %s\n' "$file" >&2
+                        exit 1
+                        ;;
+                    esac
+                  done < <(git diff --name-only -z)
+
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-            - name: Run autover (apply)
-              # exit 0 in a step never skips later steps, so the label guard
-              # lives here while changelog regeneration runs for every push.
-              if: ${{ steps.pr.outputs.found == 'true' && steps.pr.outputs.has_required == 'true' }}
-              id: apply_autover
-              run: |
-                  set -euo pipefail
-                  line="$(npx --yes @mikinho/autover --workspaces --guard-unchanged --no-amend --short)"
-                  echo "$line"
-                  echo "summary=${line//'%'/'%25'}" >> "$GITHUB_OUTPUT"
-
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Generate Changelog
-              run: npm run changelog
-
-            - name: Commit version changes
-              id: commit_autover
-              run: |
-                  set -euo pipefail
-                  if [ -z "$(git status --porcelain)" ]; then
-                    echo "changed=false" >> "$GITHUB_OUTPUT"
-                    echo "No autover file changes to commit."
-                    exit 0
-                  fi
-                  git add -A
-                  git commit -m "chore: apply autover metadata and changelog"
-                  echo "changed=true" >> "$GITHUB_OUTPUT"
-
-            - name: Push autover commit back
-              if: ${{ steps.commit_autover.outputs.changed == 'true' }}
-              run: git push
-
-            - name: Optionally create tag from autover output
-              if: ${{ env.CREATE_TAG == 'true' && steps.commit_autover.outputs.changed == 'true' }}
-              run: |
-                  set -euo pipefail
-                  line="${{ steps.apply_autover.outputs.summary }}"
-                  ver="$(echo "$line" | awk -F'|' '{gsub(/^ *| *$/,"",$2); print $2}')"
-                  if [ -n "$ver" ] && [ "$ver" != "unchanged" ]; then
-                    tag="v$(echo "$ver" | sed 's/[+-].*$//')"
-                    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-                      echo "Tag $tag already exists; skipping."
-                    else
-                      git tag "$tag"
-                      git push origin "$tag"
-                    fi
-                  fi
-
-            - name: Comment result on the source PR
-              uses: actions/github-script@v9
-              with:
-                  script: |
-                      const prNumber = Number(`${{ steps.pr.outputs.number || 0 }}`);
-                      if (!prNumber) return;
-                      const summary = `${{ toJSON(steps.apply_autover.outputs.summary) }}`.replace(/^"|"$/g, "");
-                      const body = summary && summary.trim().length
-                        ? `✅ **autover** applied on \`main\`\n\n\`${summary}\``
-                        : "ℹ️ **autover** ran on `main` but produced no changes.";
-                      await github.rest.issues.createComment({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        issue_number: prNumber,
-                        body
-                      });
+                  git add -- package.json package-lock.json CHANGELOG.md
+                  git commit -m "chore(release): apply autover metadata"
+                  git push origin HEAD:main
+                  git config --local --unset-all http.https://github.com/.extraheader || true

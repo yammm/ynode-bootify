@@ -44,3 +44,9 @@ Icon?
 # Example: Xcode build artifacts
 build/
 *.xcodeproj/xcuserdata/
+
+# Public repository policy files must remain trackable.
+!README.md
+!CONTRIBUTING.md
+!NOTICE.md
+!SECURITY.md

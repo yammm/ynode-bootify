@@ -1,0 +1,152 @@
+name: release
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+
+permissions:
+    contents: read
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    validate:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Verify signed annotated tag
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+              env:
+                  TAG_NAME: ${{ github.ref_name }}
+              with:
+                  script: |
+                      const tagName = process.env.TAG_NAME;
+                      if (!/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.test(tagName)) {
+                        core.setFailed(`Invalid release tag: ${tagName}`);
+                        return;
+                      }
+                      const { data: ref } = await github.rest.git.getRef({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        ref: `tags/${tagName}`,
+                      });
+                      if (ref.object.type !== "tag") {
+                        core.setFailed("Release tags must be signed annotated tags.");
+                        return;
+                      }
+                      const { data: tag } = await github.rest.git.getTag({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        tag_sha: ref.object.sha,
+                      });
+                      if (tag.object.type !== "commit" || tag.object.sha !== context.sha) {
+                        core.setFailed("Release tag does not resolve to the workflow commit.");
+                        return;
+                      }
+                      if (!tag.verification?.verified) {
+                        core.setFailed(
+                          `Release tag signature is not verified: ${tag.verification?.reason ?? "unknown"}`
+                        );
+                      }
+
+            - name: Checkout tagged commit
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Verify the tagged commit is on main
+              shell: bash
+              run: git merge-base --is-ancestor HEAD origin/main
+
+            - name: Setup Node
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: "24.0.0"
+                  cache: npm
+                  registry-url: https://registry.npmjs.org
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Verify release identity
+              env:
+                  TAG_NAME: ${{ github.ref_name }}
+              run: npm run release:check -- "$TAG_NAME"
+
+            - name: Run publication gates
+              run: npm run prepublishOnly
+
+            - name: Pack the tested artifact
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir artifact
+                  npm pack --ignore-scripts --json --pack-destination artifact \\
+                    > "$RUNNER_TEMP/pack.json"
+                  node --input-type=module - "$RUNNER_TEMP/pack.json" <<'NODE'
+                  import { readFileSync } from "node:fs";
+
+                  const [packed] = JSON.parse(readFileSync(process.argv[2], "utf8"));
+                  if (!packed?.filename || !Array.isArray(packed.files)) {
+                    throw new Error("npm pack did not report exactly one artifact");
+                  }
+                  NODE
+
+            - name: Upload tested artifact
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: npm-package-${{ github.ref_name }}
+                  path: artifact/*.tgz
+                  if-no-files-found: error
+                  retention-days: 7
+
+    publish:
+        needs: validate
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - name: Setup Node for trusted publishing
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: "24.0.0"
+                  registry-url: https://registry.npmjs.org
+
+            - name: Download tested artifact
+              uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+              with:
+                  name: npm-package-${{ github.ref_name }}
+                  path: artifact
+
+            - name: Install trusted-publishing npm CLI
+              run: npm install --global npm@11.17.0
+
+            - name: Require an OIDC-capable npm CLI
+              run: |
+                  node --input-type=module <<'NODE'
+                  import { execFileSync } from "node:child_process";
+
+                  const version = execFileSync("npm", ["--version"], { encoding: "utf8" }).trim();
+                  const [major, minor] = version.split(".").map(Number);
+                  if (major < 11 || (major === 11 && minor < 5)) {
+                    throw new Error(`npm 11.5.1 or newer is required; found ${version}`);
+                  }
+                  NODE
+
+            - name: Publish exact tested tarball with provenance
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  shopt -s nullglob
+                  archives=(artifact/*.tgz)
+                  if [[ "${#archives[@]}" -ne 1 ]]; then
+                    printf 'expected one npm tarball, found %s\n' "${#archives[@]}" >&2
+                    exit 1
+                  fi
+                  npm publish "${archives[0]}" --access public --provenance

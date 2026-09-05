@@ -41,15 +41,13 @@ npm run docs
 
 ## Release Process
 
-This package uses [`@mikinho/autover`](https://github.com/yammm/ynode-autover) for automated versioning and changelog generation.
+Release metadata is prepared locally and publication is performed by the tag-only GitHub Actions workflow using npm trusted publishing.
 
-To release a new version seamlessly:
+1. Start from a clean, synchronized `main` branch.
+2. Run `npm run release:patch`, `npm run release:minor`, or `npm run release:major`.
+3. Review the generated changelog, signed commit, and signed `vX.Y.Z` tag.
+4. Push both together with `git push --follow-tags`.
 
-1. Make your code changes in a branch.
-2. Open a Pull Request against `main`.
-3. Add the **`autover-apply`** label to the Pull Request.
-4. Merge the Pull Request.
+The helper runs every publication gate after setting the clean SemVer, stages only `package.json`, `package-lock.json`, and `CHANGELOG.md`, signs and signs off the release commit, and creates a signed tag. It never pushes or publishes. The release workflow verifies the signed tag, version, changelog, main-branch ancestry, and exact packed artifact before publishing with OIDC and registry provenance.
 
-Upon merge, the GitHub Action runner bumps the package version when the required label is present, regenerates `CHANGELOG.md`, and commits changed release metadata directly to `main`. Automatic tag creation is currently disabled by the workflow configuration.
-
-> **Note:** Direct commits to `main` do not receive an automatic version bump, although the workflow may still refresh the changelog.
+Configure the npm trusted publisher for this repository and `.github/workflows/release.yml`. Do not add a long-lived npm token.
