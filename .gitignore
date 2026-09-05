@@ -45,7 +45,12 @@ Icon?
 build/
 *.xcodeproj/xcuserdata/
 
+# Local review and agent guidance
+/.review/
+/*.md
+
 # Public repository policy files must remain trackable.
+!CHANGELOG.md
 !README.md
 !CONTRIBUTING.md
 !NOTICE.md
