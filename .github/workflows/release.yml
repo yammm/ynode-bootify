@@ -165,4 +165,4 @@ jobs:
                     printf 'expected one npm tarball, found %s\n' "${#archives[@]}" >&2
                     exit 1
                   fi
-                  npm publish "${archives[0]}" --access public --provenance
+                  npm publish "./${archives[0]}" --access public --provenance
