@@ -4,12 +4,21 @@ on:
     push:
         tags:
             - "v*.*.*"
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: Existing signed release tag to publish
+                required: true
+                type: string
 
 permissions:
     contents: read
 
+env:
+    RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
 concurrency:
-    group: release-${{ github.ref }}
+    group: release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
     cancel-in-progress: false
 
 jobs:
@@ -19,9 +28,10 @@ jobs:
             contents: read
         steps:
             - name: Verify signed annotated tag
+              id: release-tag
               uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
               env:
-                  TAG_NAME: ${{ github.ref_name }}
+                  TAG_NAME: ${{ env.RELEASE_TAG }}
               with:
                   script: |
                       const tagName = process.env.TAG_NAME;
@@ -43,21 +53,28 @@ jobs:
                         repo: context.repo.repo,
                         tag_sha: ref.object.sha,
                       });
-                      if (tag.object.type !== "commit" || tag.object.sha !== context.sha) {
-                        core.setFailed("Release tag does not resolve to the workflow commit.");
+                      if (tag.object.type !== "commit") {
+                        core.setFailed("Release tag does not resolve to a commit.");
                         return;
                       }
                       if (!tag.verification?.verified) {
                         core.setFailed(
                           `Release tag signature is not verified: ${tag.verification?.reason ?? "unknown"}`
                         );
+                        return;
                       }
+                      if (context.eventName === "push" && tag.object.sha !== context.sha) {
+                        core.setFailed("Pushed release tag does not resolve to the workflow commit.");
+                        return;
+                      }
+                      core.setOutput("commit_sha", tag.object.sha);
 
             - name: Checkout tagged commit
               uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   fetch-depth: 0
                   persist-credentials: false
+                  ref: ${{ steps.release-tag.outputs.commit_sha }}
 
             - name: Verify the tagged commit is on main
               shell: bash
@@ -75,7 +92,7 @@ jobs:
 
             - name: Verify release identity
               env:
-                  TAG_NAME: ${{ github.ref_name }}
+                  TAG_NAME: ${{ env.RELEASE_TAG }}
               run: npm run release:check -- "$TAG_NAME"
 
             - name: Run publication gates
@@ -86,8 +103,7 @@ jobs:
               run: |
                   set -euo pipefail
                   mkdir artifact
-                  npm pack --ignore-scripts --json --pack-destination artifact \\
-                    > "$RUNNER_TEMP/pack.json"
+                  npm pack --ignore-scripts --json --pack-destination artifact > "$RUNNER_TEMP/pack.json"
                   node --input-type=module - "$RUNNER_TEMP/pack.json" <<'NODE'
                   import { readFileSync } from "node:fs";
 
@@ -100,7 +116,7 @@ jobs:
             - name: Upload tested artifact
               uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               with:
-                  name: npm-package-${{ github.ref_name }}
+                  name: npm-package-${{ env.RELEASE_TAG }}
                   path: artifact/*.tgz
                   if-no-files-found: error
                   retention-days: 7
@@ -121,7 +137,7 @@ jobs:
             - name: Download tested artifact
               uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
               with:
-                  name: npm-package-${{ github.ref_name }}
+                  name: npm-package-${{ env.RELEASE_TAG }}
                   path: artifact
 
             - name: Install trusted-publishing npm CLI

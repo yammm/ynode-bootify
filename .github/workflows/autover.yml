@@ -126,17 +126,18 @@ jobs:
                   fi
                   npm run changelog
 
-                  unexpected="$(git diff --name-only -- . \\
-                    ':(exclude)package.json' \\
-                    ':(exclude)package-lock.json' \\
-                    ':(exclude)CHANGELOG.md')"
+                  allowed_paths=(
+                    ':(exclude)package.json'
+                    ':(exclude)package-lock.json'
+                    ':(exclude)CHANGELOG.md'
+                  )
+                  unexpected="$(git diff --name-only -- . "${allowed_paths[@]}")"
                   if [[ -n "$unexpected" ]]; then
                     printf 'autover changed unexpected paths:\n%s\n' "$unexpected" >&2
                     exit 1
                   fi
 
-                  git diff --binary -- package.json package-lock.json CHANGELOG.md \\
-                    > "$RUNNER_TEMP/autover.patch"
+                  git diff --binary -- package.json package-lock.json CHANGELOG.md > "$RUNNER_TEMP/autover.patch"
                   if [[ -s "$RUNNER_TEMP/autover.patch" ]]; then
                     echo "changed=true" >> "$GITHUB_OUTPUT"
                   else
